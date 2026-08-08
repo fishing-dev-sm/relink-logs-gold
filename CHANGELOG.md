@@ -5,6 +5,12 @@ version without a section here, and the section body becomes the GitHub
 release body — which the in-app update prompt shows as patch notes. Renders
 markdown in the app.
 
+## 1.12.10-9001
+
+### Notes
+
+- **GOLD branding throughout.** The app now identifies itself as **Relink Logs GOLD** in the Logs window header, the overlay header's `{app}` token, and the settings preview, and as **GBFR Logs GOLD** in the installer, install folder, and exe/hook file metadata. No functional changes — the gold-rule settings (Settings → General) behave exactly as in 1.12.10-9000.
+
 ## 1.12.10
 
 ### Notes

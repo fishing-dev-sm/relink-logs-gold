@@ -7,7 +7,7 @@
   },
   "package": {
     "productName": "GBFR Logs GOLD",
-    "version": "1.12.10-9000"
+    "version": "1.12.10-9001"
   },
   "tauri": {
     "allowlist": {
