@@ -7,8 +7,12 @@ name: Gold Release
 #
 #   - Releases are MANUAL only ("Run workflow" from dev). No RC auto-bump on
 #     push, no main promotion: the version in the five version files IS the
-#     release, in upstream's base scheme plus the fork's suffix
-#     (1.12.10-gold). Bump it by hand when cutting a release.
+#     release. Fork versions are upstream's base plus a NUMERIC prerelease
+#     from the 9000 series (1.12.10-9000, then -9001, ...): WiX turns the
+#     prerelease into the MSI ProductVersion's 4th field and rejects anything
+#     non-numeric (a literal "-gold" suffix fails the Windows bundle), and
+#     9000+ never collides with upstream's own RC tags (-1, -2, ...). Bump it
+#     by hand when cutting a release.
 #   - No Authenticode (Azure Trusted Signing belongs to upstream): hook.dll,
 #     the exe and the MSI ship UNSIGNED. Expect SmartScreen/AV warnings; the
 #     in-app update flow is unaffected because it checks minisign, not
