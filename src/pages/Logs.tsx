@@ -128,7 +128,7 @@ const Layout = () => {
             <Group h="100%" gap="sm" wrap="nowrap" style={{ flex: 1 }}>
               {/* eslint-disable-next-line i18next/no-literal-string -- app name, never translated */}
               <Text style={{ whiteSpace: "nowrap" }}>
-                Relink Logs
+                Relink Logs GOLD
                 {version && ` - v${version}`}
                 {version && versionSuffix && (
                   <Text span c="dimmed">
