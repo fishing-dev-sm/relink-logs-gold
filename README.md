@@ -4,7 +4,7 @@
 
 Overlay DPS parser/meter for Granblue Fantasy: Relink.
 
-**This repository is a fork of [villith/relink-logs](https://github.com/villith/relink-logs).** It tracks upstream's `dev` branch and adds exactly one divergence: user-configurable "gold rules" for the legality audit (see below). Everything else — features, fixes, releases — comes from upstream. Relink Logs itself was built upon [false-spring/gbfr-logs](https://github.com/false-spring/gbfr-logs), which is no longer maintained, and on the reverse engineering from [nyaoouo/GBFR-ACT](https://github.com/nyaoouo/GBFR-ACT).
+**This repository is a fork of [villith/relink-logs](https://github.com/villith/relink-logs).** It tracks upstream's `dev` branch and adds exactly one divergence: user-configurable "gold rules" for the legality audit (see below). Everything else — features, fixes, releases — comes from upstream. The fork's own manual (versioning, releasing, upstream-tracking) lives in [GOLDME.md](./GOLDME.md). Relink Logs itself was built upon [false-spring/gbfr-logs](https://github.com/false-spring/gbfr-logs), which is no longer maintained, and on the reverse engineering from [nyaoouo/GBFR-ACT](https://github.com/nyaoouo/GBFR-ACT).
 
 ## Why this fork exists: the gold rules
 
