@@ -1,16 +1,32 @@
-# relink-logs
+# relink-logs (gold-rules fork)
 
-[![GitHub Release](https://img.shields.io/github/v/release/villith/relink-logs)](https://github.com/villith/relink-logs/releases)
-[![GitHub Downloads](https://img.shields.io/github/downloads/villith/relink-logs/total)](https://github.com/villith/relink-logs/releases)
-[![GitHub License](https://img.shields.io/github/license/villith/relink-logs)](./LICENSE)
+[![GitHub License](https://img.shields.io/github/license/fishing-dev-sm/relink-logs)](./LICENSE)
 
 Overlay DPS parser/meter for Granblue Fantasy: Relink.
 
-Relink Logs was built upon [false-spring/gbfr-logs](https://github.com/false-spring/gbfr-logs), which is no longer maintained. This project is an independent continuation and is **not affiliated with** the original gbfr-logs project. The original work was based on the reverse engineering from [nyaoouo/GBFR-ACT](https://github.com/nyaoouo/GBFR-ACT).
+**This repository is a fork of [villith/relink-logs](https://github.com/villith/relink-logs).** It tracks upstream's `dev` branch and adds exactly one divergence: user-configurable "gold rules" for the legality audit (see below). Everything else — features, fixes, releases — comes from upstream. Relink Logs itself was built upon [false-spring/gbfr-logs](https://github.com/false-spring/gbfr-logs), which is no longer maintained, and on the reverse engineering from [nyaoouo/GBFR-ACT](https://github.com/nyaoouo/GBFR-ACT).
+
+## Why this fork exists: the gold rules
+
+The built-in legality audit flags builds that **cannot exist** — impossible sigils, wrightstones, summons — in red. Two findings are different in kind:
+
+- a **full set of perfect summons** (every bonus at the top of its roll window)
+- **all-maxed overmasteries** (every overmastery line at its maximum)
+
+These are not impossible. They are merely astronomically unlikely — and that is exactly why the information matters. A player whose build is *only* flagged this way is either the luckiest farmer alive, or not farming at all. Upstream has swung between the two extremes: 1.12.9 marked perfect summons gold ("Blessed by RNG"), 1.12.10 stopped reporting them entirely.
+
+This fork's position: **the mark is necessary, but the verdict is yours.** Gold states a fact — "this outcome is statistically near-impossible" — it does not accuse. Whether perfect summons deserve to be shown at all, and whether all-maxed overmasteries deserve the same gold, are judgment calls that reasonable players disagree on. So they are settings, not policy:
+
+| Setting (Settings → General) | Default | On | Off |
+| --- | --- | --- | --- |
+| Show perfect summons as gold | **On** | Reported as the gold "Blessed by RNG" luck marker | Hidden entirely (upstream 1.12.10 behaviour) |
+| Show perfect overmasteries as gold | **Off** | Gold luck marker | Red cheat read (upstream behaviour) |
+
+Both defaults deliberately match upstream's current read of the world, with the one exception this fork exists for: the perfect-summon report stays available, and stays gold, unless you say otherwise.
 
 ## What's new in Relink Logs
 
-On top of the original gbfr-logs feature set, this project adds:
+On top of the original gbfr-logs feature set, the upstream project adds:
 
 - **Game v2.0.2 / expansion support** — updated hooks and game data for the expansion (new characters, quests, and items), plus correct player attribution and stun tracking in online multiplayer.
 - **Damage cap tracking** — per-skill capped-hit counts and an exact overcap % column in the skill breakdown, read from the game's own damage-cap computation.
@@ -21,7 +37,9 @@ On top of the original gbfr-logs feature set, this project adds:
 
 ## Installation
 
-### Windows
+This fork does not publish its own builds at the moment — it is source-only. If you just want the app, use the [upstream releases](https://github.com/villith/relink-logs/releases); if you want the gold rules, build from this repository (see [For Developers](#for-developers)).
+
+### Windows (upstream builds)
 
 1. Go to [Releases](https://github.com/villith/relink-logs/releases)
 2. Download the latest .msi installer and run it.
@@ -53,10 +71,8 @@ Notes:
 
 ## Found a translation problem or a bug?
 
-You don't need any coding knowledge to help — just a GitHub account:
-
-- [Report a wrong or missing translation](https://github.com/villith/relink-logs/issues/new?template=translation.yml) — fill in the form and we'll apply the fix.
-- [Report a bug](https://github.com/villith/relink-logs/issues/new?template=bug.yml)
+- For anything about the app itself, report it [upstream](https://github.com/villith/relink-logs/issues) — this fork changes nothing but the gold rules.
+- For the gold rules themselves (behaviour, wording, defaults), [open an issue on this fork](https://github.com/fishing-dev-sm/relink-logs/issues).
 
 Note: item / weapon / skill names come from the game's own data files and can't be hand-edited — only the app's interface text can be changed.
 
@@ -142,6 +158,7 @@ This project is split up into a few subprojects:
 
 This project would not have been possible without the following folks:
 
+- [villith/relink-logs](https://github.com/villith/relink-logs) — the upstream project this fork tracks.
 - [false-spring/gbfr-logs](https://github.com/false-spring/gbfr-logs) — the original project this one was built upon.
 - [nyaoouo/GBFR-ACT](https://github.com/nyaoouo/GBFR-ACT) for the original reverse engineering work.
 - [Harkain](https://github.com/Harkains) for their work on formatting and translating skills to friendly English names.
