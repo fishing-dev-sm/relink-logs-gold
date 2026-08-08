@@ -17,6 +17,7 @@ These are not impossible — and the game's own drop tables put a price on exact
 
 | Report | Odds of a legitimate roll | Scale |
 | --- | --- | --- |
+| A single perfect summon | 1 in 49 to 1 in 407 | ordinary — 42 of 72 players in a production census owned at least one, so the audit does not even report it |
 | A full set of four perfect summons | 1 in 400 million, at the reading most generous to the player (1 in 27.5 billion at the strictest) | on the order of a national-lottery jackpot |
 | Three maxed stun overmasteries | 1 in 442 million | the same lottery-jackpot order |
 | **Both on one build** | **1 in 176 quintillion to 1 in 12 sextillion** | picking one marked grain of sand out of every beach on Earth |
