@@ -1,6 +1,6 @@
 # relink-logs (gold-rules fork)
 
-[![GitHub License](https://img.shields.io/github/license/fishing-dev-sm/relink-logs)](./LICENSE)
+[![GitHub License](https://img.shields.io/github/license/fishing-dev-sm/relink-logs-gold)](./LICENSE)
 
 Overlay DPS parser/meter for Granblue Fantasy: Relink.
 
@@ -72,7 +72,7 @@ Notes:
 ## Found a translation problem or a bug?
 
 - For anything about the app itself, report it [upstream](https://github.com/villith/relink-logs/issues) — this fork changes nothing but the gold rules.
-- For the gold rules themselves (behaviour, wording, defaults), [open an issue on this fork](https://github.com/fishing-dev-sm/relink-logs/issues).
+- For the gold rules themselves (behaviour, wording, defaults), [open an issue on this fork](https://github.com/fishing-dev-sm/relink-logs-gold/issues).
 
 Note: item / weapon / skill names come from the game's own data files and can't be hand-edited — only the app's interface text can be changed.
 
