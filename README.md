@@ -13,7 +13,15 @@ The built-in legality audit flags builds that **cannot exist** — impossible si
 - a **full set of perfect summons** (every bonus at the top of its roll window)
 - **all-maxed overmasteries** (every overmastery line at its maximum)
 
-These are not impossible. They are merely astronomically unlikely — and that is exactly why the information matters. A player whose build is *only* flagged this way is either the luckiest farmer alive, or not farming at all. Upstream has swung between the two extremes: 1.12.9 marked perfect summons gold ("Blessed by RNG"), 1.12.10 stopped reporting them entirely.
+These are not impossible — and the game's own drop tables put a price on exactly how not-impossible they are:
+
+| Report | Odds of a legitimate roll | Scale |
+| --- | --- | --- |
+| A full set of four perfect summons | 1 in 400 million, at the reading most generous to the player (1 in 27.5 billion at the strictest) | on the order of a national-lottery jackpot |
+| Three maxed stun overmasteries | 1 in 442 million | the same lottery-jackpot order |
+| **Both on one build** | **1 in 176 quintillion to 1 in 12 sextillion** | picking one marked grain of sand out of every beach on Earth |
+
+Each report on its own is lottery-jackpot odds — a player could, in principle, get there honestly. Both together leave the realm of luck altogether: there are fewer stars in the Milky Way than one-in-however-many-sextillion. And that is exactly why the information matters. A player whose build is *only* flagged this way is either the luckiest farmer alive, or not farming at all. Upstream has swung between the two extremes: 1.12.9 marked perfect summons gold ("Blessed by RNG"), 1.12.10 stopped reporting them entirely.
 
 This fork's position: **the mark is necessary, but the verdict is yours.** Gold states a fact — "this outcome is statistically near-impossible" — it does not accuse. Whether perfect summons deserve to be shown at all, and whether all-maxed overmasteries deserve the same gold, are judgment calls that reasonable players disagree on. So they are settings, not policy:
 
