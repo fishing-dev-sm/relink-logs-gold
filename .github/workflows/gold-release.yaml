@@ -1,0 +1,306 @@
+name: Gold Release
+
+# The fork's release pipeline — a deliberately simplified copy of upstream's
+# release.yaml (which stays in the tree for merge cleanliness; keep it
+# DISABLED in the fork's Actions settings, it needs secrets this repo does
+# not have):
+#
+#   - Releases are MANUAL only ("Run workflow" from dev). No RC auto-bump on
+#     push, no main promotion: the version in the five version files IS the
+#     release, in upstream's base scheme plus the fork's suffix
+#     (1.12.10-gold). Bump it by hand when cutting a release.
+#   - No Authenticode (Azure Trusted Signing belongs to upstream): hook.dll,
+#     the exe and the MSI ship UNSIGNED. Expect SmartScreen/AV warnings; the
+#     in-app update flow is unaffected because it checks minisign, not
+#     Authenticode.
+#   - Updates are signed with the fork's OWN minisign key (pubkey in
+#     tauri.conf.json) and served from THIS repo's latest.json, so fork
+#     installs never update into upstream builds (which would silently drop
+#     the gold rules) and upstream installs never update into the fork.
+#   - Secrets needed: TAURI_PRIVATE_KEY (contents of the fork's minisign
+#     private key). TAURI_KEY_PASSWORD is optional (key is unencrypted).
+
+on:
+  workflow_dispatch: # the release button — publishes from dev as-is
+
+concurrency:
+  group: gold-release
+  cancel-in-progress: false
+
+jobs:
+  version:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    outputs:
+      version: ${{ steps.v.outputs.version }}
+      sha: ${{ steps.v.outputs.sha }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: dev
+      - name: Read the version and refuse to republish it
+        id: v
+        shell: bash
+        run: |
+          next="$(node -p "require('./package.json').version")"
+          if git ls-remote --tags origin "refs/tags/$next" | grep -q .; then
+            echo "::error::$next is already released - bump the version files before dispatching again."
+            exit 1
+          fi
+          echo "Releasing $next"
+          echo "version=$next" >> "$GITHUB_OUTPUT"
+          echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
+  build-hook:
+    needs: version
+    runs-on: windows-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.version.outputs.sha }}
+
+      - name: Install pinned Rust toolchain
+        shell: bash
+        run: |
+          rustup set auto-self-update disable
+          rustup toolchain install
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          cache-on-failure: true
+
+      - name: Build hook DLL
+        env:
+          HOOK_VERSION: ${{ needs.version.outputs.version }}
+        run: cargo build --release --package hook --features eject
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: hook-dll
+          path: target/release/hook.dll
+          if-no-files-found: error
+
+  build-windows:
+    needs: [version, build-hook]
+    runs-on: windows-latest
+    permissions:
+      contents: read
+    env:
+      # productName in tauri.conf.json. Drives the artifact filenames below.
+      PRODUCT: GBFR Logs
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.version.outputs.sha }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install pinned Rust toolchain
+        shell: bash
+        run: |
+          rustup set auto-self-update disable
+          rustup toolchain install
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          cache-on-failure: true
+
+      - name: Install npm dependencies
+        run: npm ci
+
+      - name: Stage hook.dll
+        uses: actions/download-artifact@v4
+        with:
+          name: hook-dll
+          path: src-tauri
+      - name: Mirror hook.dll to the cargo output path
+        shell: bash
+        run: mkdir -p target/release && cp src-tauri/hook.dll target/release/hook.dll
+
+      # No signCommand overlay (no Authenticode on the fork): the bundler
+      # still minisigns the updater zip with TAURI_PRIVATE_KEY.
+      - name: Build frontend and write CI build config
+        shell: bash
+        run: |
+          npm run build
+          echo '{"build":{"beforeBuildCommand":""}}' > .tauri-release-config.json
+
+      - name: Build and bundle app
+        run: npx tauri build -b msi,updater --config .tauri-release-config.json
+        env:
+          TAURI_PRIVATE_KEY: ${{ secrets.TAURI_PRIVATE_KEY }}
+          TAURI_KEY_PASSWORD: ${{ secrets.TAURI_KEY_PASSWORD }}
+
+      - name: Verify the updater artifact is minisigned
+        shell: bash
+        run: |
+          shopt -s nullglob
+          zip=(target/release/bundle/msi/*.msi.zip)
+          if [[ ${#zip[@]} -ne 1 ]]; then
+            echo "::error::expected exactly 1 .msi.zip, found ${#zip[@]}"
+            exit 1
+          fi
+          if [[ ! -f "${zip[0]}.sig" ]]; then
+            echo "::error::bundler did not minisign ${zip[0]}"
+            exit 1
+          fi
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows-bundle
+          path: |
+            target/release/bundle/msi/*.msi
+            target/release/bundle/msi/*.msi.zip
+            target/release/bundle/msi/*.msi.zip.sig
+          if-no-files-found: error
+
+  build-linux:
+    needs: [version, build-hook]
+    # 22.04, not -latest: Tauri v1 needs webkit2gtk-4.0, which Ubuntu 24.04
+    # no longer ships (it only has 4.1).
+    runs-on: ubuntu-22.04
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.version.outputs.sha }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      # webkit2gtk pinned to the jammy release pocket (2.36) — see upstream's
+      # release.yaml for the full reasoning (DMA-BUF-only renderer in 2.44+
+      # breaks the webview on NVIDIA/newer Mesa hosts).
+      - name: Install Tauri v1 Linux dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --allow-downgrades \
+            libwebkit2gtk-4.0-dev=2.36.0-2ubuntu1 \
+            libwebkit2gtk-4.0-37=2.36.0-2ubuntu1 \
+            libjavascriptcoregtk-4.0-dev=2.36.0-2ubuntu1 \
+            libjavascriptcoregtk-4.0-18=2.36.0-2ubuntu1 \
+            gir1.2-javascriptcoregtk-4.0=2.36.0-2ubuntu1 \
+            gir1.2-webkit2-4.0=2.36.0-2ubuntu1 \
+            build-essential curl wget file libssl-dev libgtk-3-dev libayatana-appindicator3-dev librsvg2-dev patchelf
+
+      - name: Install pinned Rust toolchain
+        run: |
+          rustup set auto-self-update disable
+          rustup toolchain install
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          cache-on-failure: true
+
+      - name: Install npm dependencies
+        run: npm ci
+
+      - name: Stage hook.dll
+        uses: actions/download-artifact@v4
+        with:
+          name: hook-dll
+          path: src-tauri
+
+      - name: Build frontend and write CI build config
+        run: |
+          npm run build
+          echo '{"build":{"beforeBuildCommand":""}}' > .tauri-release-config.json
+
+      - name: Build and bundle app (AppImage)
+        run: npx tauri build -b appimage,updater --config .tauri-release-config.json
+        env:
+          TAURI_PRIVATE_KEY: ${{ secrets.TAURI_PRIVATE_KEY }}
+          TAURI_KEY_PASSWORD: ${{ secrets.TAURI_KEY_PASSWORD }}
+          TAURI_TRAY: ayatana
+
+      - name: Verify the updater artifact is minisigned
+        run: |
+          shopt -s nullglob
+          tgz=(target/release/bundle/appimage/*.AppImage.tar.gz)
+          if [[ ${#tgz[@]} -ne 1 ]]; then
+            echo "::error::expected exactly 1 .AppImage.tar.gz, found ${#tgz[@]}"
+            exit 1
+          fi
+          if [[ ! -f "${tgz[0]}.sig" ]]; then
+            echo "::error::bundler did not minisign ${tgz[0]}"
+            exit 1
+          fi
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: linux-bundle
+          path: |
+            target/release/bundle/appimage/*.AppImage
+            target/release/bundle/appimage/*.AppImage.tar.gz
+            target/release/bundle/appimage/*.AppImage.tar.gz.sig
+          if-no-files-found: error
+
+  publish:
+    needs: [version, build-windows, build-linux]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write # creates the GitHub Release (and its tag)
+    env:
+      VERSION: ${{ needs.version.outputs.version }}
+      TARGET_SHA: ${{ needs.version.outputs.sha }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.version.outputs.sha }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      # Release notes: the CHANGELOG.md section for this version if a human
+      # wrote one, else a generic gold-fork note. The notes double as the
+      # updater prompt's text via latest.json.
+      - name: Extract release notes
+        shell: bash
+        run: |
+          if notes="$(node scripts/extract-changelog.mjs "$VERSION" 2>/dev/null)"; then
+            echo "Using the CHANGELOG.md section for $VERSION."
+          else
+            notes="Gold-rules fork build $VERSION — upstream relink-logs with user-configurable gold rules (Settings → General). See the README for what the two checkboxes do."
+          fi
+          {
+            echo "$notes"
+            echo ""
+            echo "Make sure to save and exit the game before updating."
+          } > notes.md
+
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist-assets
+          pattern: "*-bundle"
+          merge-multiple: true
+
+      - name: Flatten downloaded artifacts
+        run: |
+          find dist-assets -mindepth 2 -type f -exec mv -t dist-assets {} +
+          find dist-assets -mindepth 1 -type d -empty -delete
+          ls -l dist-assets
+
+      - name: Generate latest.json
+        run: node scripts/make-latest-json.mjs "$VERSION" notes.md dist-assets "$GITHUB_REPOSITORY"
+
+      # Published (not draft) so releases/latest/download/latest.json resolves —
+      # that manifest is the updater endpoint. `--target` creates the version
+      # tag on the released commit, atomically with the release.
+      - name: Publish GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release create "$VERSION" dist-assets/* \
+            --target "$TARGET_SHA" \
+            --title "Relink Logs Gold $VERSION" \
+            --notes-file notes.md

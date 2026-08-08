@@ -37,11 +37,11 @@ On top of the original gbfr-logs feature set, the upstream project adds:
 
 ## Installation
 
-This fork does not publish its own builds at the moment — it is source-only. If you just want the app, use the [upstream releases](https://github.com/villith/relink-logs/releases); if you want the gold rules, build from this repository (see [For Developers](#for-developers)).
+This fork publishes its own builds (Windows MSI and Linux AppImage), unsigned — expect a SmartScreen/AV prompt on first run (upstream pays for a code-signing certificate; this fork does not). In-app updates work between fork releases only: fork builds never update into upstream builds and vice versa, by design.
 
-### Windows (upstream builds)
+### Windows
 
-1. Go to [Releases](https://github.com/villith/relink-logs/releases)
+1. Go to [Releases](https://github.com/fishing-dev-sm/relink-logs-gold/releases)
 2. Download the latest .msi installer and run it.
 3. Open GBFR Logs
 4. Launch the game (interchangeable with previous step)
@@ -52,7 +52,7 @@ Relink Logs runs natively on Linux and meters the Windows game running under
 Steam's Proton. Steam Deck gaming mode is **not** supported (an external
 overlay cannot draw over gamescope).
 
-1. Go to [Releases](https://github.com/villith/relink-logs/releases)
+1. Go to [Releases](https://github.com/fishing-dev-sm/relink-logs-gold/releases)
 2. Download the latest AppImage from the releases page
 3. Make it executable (`chmod +x`), and run it
 4. Launch Relink Logs, open **Settings → Linux setup**, and click **Install hook** if it isn't already green.
@@ -66,7 +66,7 @@ Notes:
 - The overlay uses X11 (via XWayland on Wayland desktops). Always-on-top and
   clickthrough behavior can vary by compositor; X11 sessions are the most
   reliable. If the overlay hides behind the game, see the FAQ entry
-- The hook file installed into the game folder is the same Authenticode-signed `hook.dll` Windows uses, renamed to `dinput8.dll`.
+- The hook file installed into the game folder is the same `hook.dll` Windows uses, renamed to `dinput8.dll` (unsigned in this fork's builds — see Installation).
   - Use **Remove hook** in Settings to delete it
 
 ## Found a translation problem or a bug?
@@ -113,7 +113,7 @@ See [how to add an exclusion to Windows Defender](https://support.microsoft.com/
 
 Launching the application will automatically check for new updates!
 
-Same as with installing, you can download the [latest release](https://github.com/villith/relink-logs/releases) and run the installer again and it will update over your old installation.
+Same as with installing, you can download the [latest release](https://github.com/fishing-dev-sm/relink-logs-gold/releases) and run the installer again and it will update over your old installation.
 
 > Q: How do I uninstall?
 
