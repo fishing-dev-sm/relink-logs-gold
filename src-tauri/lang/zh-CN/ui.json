@@ -473,7 +473,7 @@
       "om-tab-no-match": "无匹配结果",
       "om-below-level": "符合，但低于最低等级要求",
       "hook-outdated": "游戏正在运行旧版本 Hook，请重启游戏以应用更新。",
-      "hook-unreachable": "无法连接游戏 Hook。如果问题持续存在，请重启游戏和 Relink Logs。",
+      "hook-unreachable": "无法连接游戏 Hook。如果问题持续存在，请重启游戏和 Relink Logs GOLD。",
       "transmarvel-wishlist": "高级炼成心愿单",
       "tm-game-not-running": "游戏未运行。请先启动游戏，然后重新打开此工具。",
       "tm-unpredictable": "随机数尚未初始化 — 请先进行一次高级炼成，之后即可进行预测。",

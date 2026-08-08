@@ -26,11 +26,13 @@ eject = []
 
 [package.metadata.winres]
 OriginalFilename = "hook.dll"
-ProductName = "GBFR Logs"
-FileDescription = "GBFR Logs damage meter hook"
+ProductName = "GBFR Logs GOLD"
+FileDescription = "GBFR Logs GOLD damage meter hook"
 InternalName = "hook.dll"
 CompanyName = "Scott Donnelly"
-Comments = "Source: https://github.com/villith/relink-logs"
+# The upstream URL substring doubles as an ownership marker: deploy.rs
+# recognises our dinput8.dll in the game folder by it. Keep it intact.
+Comments = "Source: https://github.com/fishing-dev-sm/relink-logs-gold (fork of https://github.com/villith/relink-logs)"
 
 [dependencies]
 anyhow = "1.0"

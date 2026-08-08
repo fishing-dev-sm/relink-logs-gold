@@ -92,9 +92,6 @@ jobs:
     runs-on: windows-latest
     permissions:
       contents: read
-    env:
-      # productName in tauri.conf.json. Drives the artifact filenames below.
-      PRODUCT: GBFR Logs
     steps:
       - uses: actions/checkout@v4
         with:

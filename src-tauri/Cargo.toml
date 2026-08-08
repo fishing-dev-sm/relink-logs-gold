@@ -2,15 +2,15 @@
 name = "gbfr-logs"
 version = "1.12.10-9000"
 default-run = "gbfr-logs"
-description = "Relink Logs"
+description = "Relink Logs GOLD"
 authors = ["you"]
 edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 [package.metadata.tauri-winres]
 CompanyName = "Scott Donnelly"
-OriginalFilename = "GBFR Logs.exe"
-Comments = "Source: https://github.com/villith/relink-logs"
+OriginalFilename = "GBFR Logs GOLD.exe"
+Comments = "Source: https://github.com/fishing-dev-sm/relink-logs-gold"
 
 [build-dependencies]
 tauri-build = { version = "1.5", features = [] }

@@ -665,7 +665,7 @@
       "searching": "Searching...",
       "game-not-running": "Game is not running. Start Granblue Fantasy: Relink first — the helper reads your sigil box and the synthesis seed from the game.",
       "hook-outdated": "The game is running an outdated version of the hook. Restart the game to load the update.",
-      "hook-unreachable": "Couldn't reach the game hook. If this keeps happening, restart the game and Relink Logs.",
+      "hook-unreachable": "Couldn't reach the game hook. If this keeps happening, restart the game and Relink Logs GOLD.",
       "invalid-trait": "Pick a real trait (the empty-slot placeholder can't be searched).",
       "rng-unpredictable": "The synthesis RNG has no seed yet. Perform one synthesis or complete a quest, then search again.",
       "seed-not-latched": "Open the Sigil Synthesis screen in game before searching — it locks in the prediction seed as it opens, so a list found beforehand will not match your first synthesis.",

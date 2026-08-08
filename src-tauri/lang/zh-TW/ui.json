@@ -291,7 +291,7 @@
       "om-col-lvl": "等級",
       "om-below-level": "符合，但低於最低等級要求",
       "hook-outdated": "遊戲正在執行舊版本 Hook，請重啟遊戲以套用更新。",
-      "hook-unreachable": "無法連線至遊戲 Hook。如果問題持續存在，請重啟遊戲和 Relink Logs。",
+      "hook-unreachable": "無法連線至遊戲 Hook。如果問題持續存在，請重啟遊戲和 Relink Logs GOLD。",
       "transmarvel-wishlist": "高級煉成心願單",
       "tm-game-not-running": "遊戲未執行。請先啟動遊戲，然後重新開啟此工具。",
       "tm-unpredictable": "隨機數尚未初始化 —— 請先進行一次高級煉成，之後即可進行預測。",

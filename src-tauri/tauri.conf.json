@@ -6,7 +6,7 @@
     "distDir": "../dist"
   },
   "package": {
-    "productName": "GBFR Logs",
+    "productName": "GBFR Logs GOLD",
     "version": "1.12.10-9000"
   },
   "tauri": {
@@ -89,8 +89,8 @@
       ],
       "identifier": "com.false",
       "publisher": "Scott Donnelly",
-      "longDescription": "GBFR Logs - DPS Meter for Granblue Fantasy: Relink",
-      "shortDescription": "GBFR Logs",
+      "longDescription": "GBFR Logs GOLD - DPS Meter for Granblue Fantasy: Relink",
+      "shortDescription": "GBFR Logs GOLD",
       "icon": [
         "icons/32x32.png",
         "icons/128x128.png",
