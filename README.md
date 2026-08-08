@@ -1,4 +1,4 @@
-# relink-logs (gold-rules fork)
+# relink-logs-gold (gold-rules fork)
 
 [![GitHub License](https://img.shields.io/github/license/fishing-dev-sm/relink-logs-gold)](./LICENSE)
 
