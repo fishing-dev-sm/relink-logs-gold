@@ -126,6 +126,16 @@ interface MeterSettings {
    * where names are hidden anyway. Only has effect while
    * `show_flagged_builds` is on. */
   highlight_illegal_builds: boolean;
+  /** LOCAL FORK SETTING: report a full set of perfect summons as the gold
+   * "Blessed by RNG" luck marker. On by default in this fork. Off reproduces
+   * upstream 1.12.10, which stopped reporting perfect summons at all — the
+   * finding is hidden on every surface (the audit still records it, so
+   * switching back on restores the marks with no rescan). */
+  gold_perfect_summons: boolean;
+  /** LOCAL FORK SETTING: read perfect overmasteries (all maxed) as gold luck
+   * too. Off by default, matching upstream, which reads them as a cheat: OM
+   * rolls come from a bounded ladder a few rerolls can walk. */
+  gold_perfect_overmasteries: boolean;
   show_full_values: boolean;
   use_condensed_skills: boolean;
   /** Count Primal Burst damage toward the meters. Off by default: whether a
@@ -199,6 +209,8 @@ const DEFAULT_METER_SETTINGS: MeterSettings = {
   streamer_mode: false,
   show_flagged_builds: false,
   highlight_illegal_builds: true,
+  gold_perfect_summons: true,
+  gold_perfect_overmasteries: false,
   show_full_values: false,
   use_condensed_skills: true,
   include_primal_burst: false,

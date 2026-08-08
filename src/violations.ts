@@ -11,11 +11,13 @@
  * summon" is a mod, "perfect summons" is a farmer's luck, and merging them
  * would turn a report into an accusation.
  *
- * That distinction has a colour. Perfect summons is the one violation whose
- * most likely explanation is a farmer who got there, so it reads gold — a
- * compliment, "Blessed by RNG" — and a player it is the ONLY thing against
- * reads gold everywhere their name is marked. One real breach turns them red:
- * luck does not launder a modded sigil.
+ * That distinction has a colour. Perfect summons and perfect overmasteries are
+ * the violations whose most likely explanation is a farmer who got there, so
+ * they CAN read gold — a compliment, "Blessed by RNG" — and a player they are
+ * the ONLY thing against reads gold everywhere their name is marked. Which of
+ * the two actually reads gold is a user setting in this fork (see `GoldRules`);
+ * one real breach turns them red either way: luck does not launder a modded
+ * sigil.
  */
 
 import { TFunction } from "i18next";
@@ -67,24 +69,52 @@ export const violationLabel = (t: TFunction, violation: Violation): string => t(
 /**
  * How a violation reads: as cheating, or as luck.
  *
- * Only perfect summons is luck. Perfect overmasteries stays a cheat read: its
- * rolls come from a bounded ladder a few rerolls can walk, so all-maxed is not
- * the astronomical draw a full set of perfect summons is.
+ * LOCAL FORK POLICY (differs from upstream): which long-odds reports read as
+ * luck is a USER SETTING here, not a constant — `GoldRules` carries the two
+ * checkboxes (Settings → General). Upstream has no such choice: it reads only
+ * perfect summons as luck (its reasoning: OM rolls come from a bounded ladder
+ * a few rerolls can walk), and since 1.12.10 it does not report perfect
+ * summons at all. `gold_perfect_summons: false` reproduces exactly that by
+ * hiding the report (see `visibleFindings`); `gold_perfect_overmasteries:
+ * true` goes the other way and marks all-maxed OMs gold, remarkable enough to
+ * praise rather than accuse.
  */
 export type LegalityTone = "cheat" | "lucky";
 
-export const violationTone = (violation: Violation): LegalityTone =>
-  violation === "perfectSummons" ? "lucky" : "cheat";
+/** The two gold-rule checkboxes, as the tone functions take them. Mirrors
+ * `gold_perfect_summons` / `gold_perfect_overmasteries` in the meter settings
+ * store; components read them through `useGoldRules`. */
+export interface GoldRules {
+  perfectSummons: boolean;
+  perfectOvermasteries: boolean;
+}
+
+export const violationTone = (violation: Violation, gold: GoldRules): LegalityTone => {
+  if (violation === "perfectSummons") return gold.perfectSummons ? "lucky" : "cheat";
+  if (violation === "perfectOvermasteries") return gold.perfectOvermasteries ? "lucky" : "cheat";
+  return "cheat";
+};
 
 /** The tone of a whole set: lucky only when EVERYTHING against it is luck.
  * Undefined on an empty set — "not judged" has no colour. */
-export const toneOfViolations = (violations: Violation[]): LegalityTone | undefined => {
+export const toneOfViolations = (violations: Violation[], gold: GoldRules): LegalityTone | undefined => {
   if (violations.length === 0) return undefined;
-  return violations.every((violation) => violationTone(violation) === "lucky") ? "lucky" : "cheat";
+  return violations.every((violation) => violationTone(violation, gold) === "lucky") ? "lucky" : "cheat";
 };
 
-export const findingsTone = (findings: { rule: LegalityRule }[]): LegalityTone | undefined =>
-  toneOfViolations(findings.map((finding) => violationOf(finding.rule)));
+export const findingsTone = (findings: { rule: LegalityRule }[], gold: GoldRules): LegalityTone | undefined =>
+  toneOfViolations(
+    findings.map((finding) => violationOf(finding.rule)),
+    gold
+  );
+
+/** The findings a surface should show under the current gold rules. Only one
+ * rule is ever hidden: with "perfect summons as gold" off, the perfect-summon
+ * report disappears entirely (upstream 1.12.10 behaviour — it is luck or it
+ * is nothing, never an accusation). Perfect overmasteries are always SHOWN;
+ * their checkbox only picks the colour. */
+export const visibleFindings = <F extends { rule: LegalityRule }>(findings: F[], gold: GoldRules): F[] =>
+  gold.perfectSummons ? findings : findings.filter((finding) => finding.rule !== "summonPerfectCount");
 
 /** The Mantine colour each tone marks in, so every surface resolves the same
  * pair and none can invent a third. Yellow is Mantine's gold. */

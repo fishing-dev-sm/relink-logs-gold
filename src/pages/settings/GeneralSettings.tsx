@@ -27,6 +27,8 @@ const GeneralSettings = () => {
     open_log_on_save,
     auto_check_updates,
     show_flagged_builds,
+    gold_perfect_summons,
+    gold_perfect_overmasteries,
     setMeterSettings,
   } = useSettings();
   const { checking, checkNow } = useManualUpdateCheck();
@@ -156,6 +158,23 @@ const GeneralSettings = () => {
         </Tooltip>
         <NewChip id="flagged-builds-setting" />
       </Group>
+      {/* LOCAL FORK: the two gold-rule checkboxes. Which long-odds reports
+          read gold ("Blessed by RNG") is the user's choice here; upstream
+          hard-codes "perfect summons only". */}
+      <Tooltip label={t("ui.gold-perfect-summons-description")} multiline w={320}>
+        <Checkbox
+          label={t("ui.gold-perfect-summons")}
+          checked={gold_perfect_summons}
+          onChange={(event) => setMeterSettings({ gold_perfect_summons: event.currentTarget.checked })}
+        />
+      </Tooltip>
+      <Tooltip label={t("ui.gold-perfect-overmasteries-description")} multiline w={320}>
+        <Checkbox
+          label={t("ui.gold-perfect-overmasteries")}
+          checked={gold_perfect_overmasteries}
+          onChange={(event) => setMeterSettings({ gold_perfect_overmasteries: event.currentTarget.checked })}
+        />
+      </Tooltip>
       <Tooltip label={t("ui.debug-mode-description")}>
         <Checkbox label={t("ui.debug-mode")} checked={debugMode} onChange={toggleDebugMode} />
       </Tooltip>

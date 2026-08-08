@@ -758,7 +758,11 @@
     "highlight-illegal-builds-description": "当作弊审查标记某玩家时，在悬浮窗中将其名称着色。",
     "highlight-illegal-builds-requires-flagged": "请先在 设置 → 通用 中开启“启用作弊审查”以使用此功能。",
     "show-flagged-builds": "启用作弊审查",
-    "show-flagged-builds-description": "在任务列表、装备/配置选项卡及悬浮窗中标记被作弊审查发现的玩家。"
+    "show-flagged-builds-description": "在任务列表、装备/配置选项卡及悬浮窗中标记被作弊审查发现的玩家。",
+    "gold-perfect-summons": "完美召唤兽显示为金色",
+    "gold-perfect-summons-description": "将整套完美召唤兽报告为金色“欧皇附体”运气标记。关闭则完全不显示该报告（上游 1.12.10 起的默认行为）。",
+    "gold-perfect-overmasteries": "完美上限突破金色",
+    "gold-perfect-overmasteries-description": "将全满上限突破视为金色运气而非红色作弊标记。默认关闭，与上游一致。"
   },
   "characters": {
     "Pl2000": "伊德 (龙形态)",

@@ -760,7 +760,11 @@
     "highlight-illegal-builds-description": "Colours a player's name in the meter when the cheat audit flags them.",
     "highlight-illegal-builds-requires-flagged": "Turn on \"Enable Cheat Audit\" in Settings → General to use this.",
     "show-flagged-builds": "Enable Cheat Audit",
-    "show-flagged-builds-description": "Marks players the cheat audit flagged in the quest list, equipment/build tabs, and in the meter."
+    "show-flagged-builds-description": "Marks players the cheat audit flagged in the quest list, equipment/build tabs, and in the meter.",
+    "gold-perfect-summons": "Show perfect summons as gold",
+    "gold-perfect-summons-description": "Reports a full set of perfect summons as the gold \"Blessed by RNG\" luck marker. Off hides the report entirely (upstream default since 1.12.10).",
+    "gold-perfect-overmasteries": "Show perfect overmasteries as gold",
+    "gold-perfect-overmasteries-description": "Reads all-maxed overmasteries as gold luck instead of a red cheat flag. Off by default, matching upstream."
   },
   "characters": {
     "Pl2000": "Id (Transformation)",

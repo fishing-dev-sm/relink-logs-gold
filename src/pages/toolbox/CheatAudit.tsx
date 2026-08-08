@@ -24,12 +24,21 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Link } from "react-router-dom";
 
+import useGoldRules from "@/hooks/useGoldRules";
 import { LegalityFlaggedPlayer, LegalitySweepProgress } from "@/types";
 import { epochToLocalTime, translateCharacterType, translateQuestId } from "@/utils";
 import { TONE_COLOR, Violation, violationLabel, violationTone } from "@/violations";
 
 import { FindingDetail } from "@/components/FindingDetail";
-import { AuditFilters, DEFAULT_FILTERS, applyFilters, auditRows, caseFor, playerKey } from "./auditRows";
+import {
+  AuditFilters,
+  DEFAULT_FILTERS,
+  applyFilters,
+  auditRows,
+  caseFor,
+  playerKey,
+  visibleFlaggedPlayers,
+} from "./auditRows";
 
 /**
  * The page's height, so its three lists scroll inside it rather than growing
@@ -58,9 +67,15 @@ const PAGE_HEIGHT = "calc(100vh - var(--app-shell-header-height, 50px) - var(--m
  * not. */
 const ViolationChip = ({ violation }: { violation: Violation }) => {
   const { t } = useTranslation();
+  const gold = useGoldRules();
 
   return (
-    <Badge size="sm" variant="light" color={TONE_COLOR[violationTone(violation)]} style={{ textTransform: "none" }}>
+    <Badge
+      size="sm"
+      variant="light"
+      color={TONE_COLOR[violationTone(violation, gold)]}
+      style={{ textTransform: "none" }}
+    >
       {violationLabel(t, violation)}
     </Badge>
   );
@@ -141,12 +156,16 @@ const CheatAuditPage = () => {
     entryRefs.current.get(entry)?.scrollIntoView?.({ block: "start", behavior: "smooth" });
   };
 
-  const kept = useMemo(() => (players ? applyFilters(players, { search }) : []), [players, search]);
-  const rows = useMemo(() => auditRows(kept).sort((a, b) => b.lastSeen - a.lastSeen), [kept]);
+  const gold = useGoldRules();
+  const kept = useMemo(
+    () => (players ? visibleFlaggedPlayers(applyFilters(players, { search }), gold) : []),
+    [players, search, gold]
+  );
+  const rows = useMemo(() => auditRows(kept, gold).sort((a, b) => b.lastSeen - a.lastSeen), [kept, gold]);
   const byKey = useMemo(() => new Map(kept.map((p) => [playerKey(p), p])), [kept]);
 
   const player = selected === null ? undefined : byKey.get(selected);
-  const found = useMemo(() => (player ? caseFor(player) : null), [player]);
+  const found = useMemo(() => (player ? caseFor(player, gold) : null), [player, gold]);
 
   // Never a rail beside an empty pane: land on someone, and follow the list
   // when a search cuts the selected person out from under the reader.

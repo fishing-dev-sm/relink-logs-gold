@@ -2,11 +2,12 @@ import { Box, Group, Text, Tooltip } from "@mantine/core";
 import { TFunction } from "i18next";
 import { useTranslation } from "react-i18next";
 
+import useGoldRules from "@/hooks/useGoldRules";
 import { describeLimit } from "@/legality";
 import { markedLines } from "@/legalityLines";
 import { LegalityFinding } from "@/types";
 import { translateTraitId } from "@/utils";
-import { TONE_COLOR, findingsTone } from "@/violations";
+import { TONE_COLOR, findingsTone, visibleFindings } from "@/violations";
 
 import { FindingsExplanation } from "./LegalityMark";
 
@@ -84,19 +85,27 @@ export const FlaggedGear = ({
   children?: React.ReactNode;
 }) => {
   const { t } = useTranslation();
+  const gold = useGoldRules();
 
-  const marks = findings.map((finding) => ({ finding, ...markedLines(finding, lines) }));
+  // The gold rules can hide a finding outright (perfect summons, checkbox
+  // off): filter first so its lines and limits vanish with the colour.
+  const visible = visibleFindings(findings, gold);
+
+  const marks = visible.map((finding) => ({ finding, ...markedLines(finding, lines) }));
   const markedAnywhere = new Set(marks.flatMap((mark) => mark.lines));
 
   // The colour says WHICH line, and its tone says what kind of claim marked it:
   // red for a cheat, gold for pure luck — with a cheat winning when both mark
   // the same line, since luck does not soften proof.
   const lineTone = (index: number) =>
-    findingsTone(marks.filter((mark) => mark.lines.includes(index)).map((mark) => mark.finding));
+    findingsTone(
+      marks.filter((mark) => mark.lines.includes(index)).map((mark) => mark.finding),
+      gold
+    );
 
   // The heading only takes the mark when no line did — otherwise it repeats
   // what the line below already says.
-  const headingTone = markedAnywhere.size === 0 ? findingsTone(findings) : undefined;
+  const headingTone = markedAnywhere.size === 0 ? findingsTone(visible, gold) : undefined;
 
   /** The phrases for a line, or for the heading when `index` is omitted. Empty
    * unless this surface prints them beside the gear. */
@@ -149,10 +158,10 @@ export const FlaggedGear = ({
     </Box>
   );
 
-  if (explain !== "tooltip" || findings.length === 0) return body;
+  if (explain !== "tooltip" || visible.length === 0) return body;
 
   return (
-    <Tooltip multiline w={340} withArrow color="dark" label={<FindingsExplanation findings={findings} />}>
+    <Tooltip multiline w={340} withArrow color="dark" label={<FindingsExplanation findings={visible} />}>
       {/* The whole item, not just its heading: the reader's eye lands on the
           reddened line, so that is where they will reach for the reason. */}
       <Box style={{ cursor: "help" }}>{body}</Box>

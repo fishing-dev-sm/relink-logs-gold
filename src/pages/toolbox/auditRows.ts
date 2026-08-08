@@ -22,7 +22,16 @@
  */
 
 import { CharacterType, LegalityFinding, LegalityFlaggedPlayer } from "@/types";
-import { LegalityTone, VIOLATIONS, Violation, findingsTone, toneOfViolations, violationOf } from "@/violations";
+import {
+  GoldRules,
+  LegalityTone,
+  VIOLATIONS,
+  Violation,
+  findingsTone,
+  toneOfViolations,
+  violationOf,
+  visibleFindings,
+} from "@/violations";
 
 /** One person, as the rail lists them. */
 export type AuditRow = {
@@ -114,13 +123,28 @@ const violationsIn = (findings: LegalityFinding[]): Violation[] => {
 export const playerKey = (player: { displayName: string; characterType: CharacterType }): string =>
   `${player.displayName}-${player.characterType}`;
 
-export const auditRows = (players: LegalityFlaggedPlayer[]): AuditRow[] =>
+/** What the gold rules leave of a player's case. With "perfect summons as
+ * gold" off, that report is hidden everywhere — and a person it was the ONLY
+ * thing against drops out of the audit entirely, exactly as upstream 1.12.10
+ * (which never records the report) would list them: not at all. */
+export const visibleFlaggedPlayers = (players: LegalityFlaggedPlayer[], gold: GoldRules): LegalityFlaggedPlayer[] =>
+  players
+    .map((player) => ({
+      ...player,
+      findings: player.findings.filter((row) => visibleFindings([row.finding], gold).length > 0),
+    }))
+    .filter((player) => player.findings.length > 0);
+
+export const auditRows = (players: LegalityFlaggedPlayer[], gold: GoldRules): AuditRow[] =>
   players.map((player) => ({
     key: playerKey(player),
     displayName: player.displayName,
     characterType: player.characterType,
     lastSeen: player.lastSeen,
-    tone: findingsTone(player.findings.map((row) => row.finding)),
+    tone: findingsTone(
+      player.findings.map((row) => row.finding),
+      gold
+    ),
   }));
 
 /** What makes a finding distinct: the same rule against the same slot is the
@@ -130,11 +154,14 @@ export const auditRows = (players: LegalityFlaggedPlayer[]): AuditRow[] =>
 const findingKey = (finding: LegalityFinding): string =>
   JSON.stringify([finding.rule, finding.subject, finding.observed, finding.allowed]);
 
-export const caseFor = (player: LegalityFlaggedPlayer): AuditCase => {
+export const caseFor = (player: LegalityFlaggedPlayer, gold: GoldRules): AuditCase => {
   // Sorted here rather than trusted from the caller: "the first sighting is the
   // most recent one" is what makes the dedup below keep the newest fight for
-  // each finding, and that is the fight its gear will be named from.
-  const rows = [...player.findings].sort((a, b) => b.time - a.time || b.logId - a.logId);
+  // each finding, and that is the fight its gear will be named from. The gold
+  // rules filter first: a hidden report builds no case.
+  const rows = [...player.findings]
+    .filter((row) => visibleFindings([row.finding], gold).length > 0)
+    .sort((a, b) => b.time - a.time || b.logId - a.logId);
 
   const byKey = new Map<string, AuditEvidence>();
   const byLog = new Map<number, AuditFight>();
@@ -169,7 +196,7 @@ export const caseFor = (player: LegalityFlaggedPlayer): AuditCase => {
 
   return {
     violations,
-    tone: toneOfViolations(violations),
+    tone: toneOfViolations(violations, gold),
     evidence,
     fights,
     evidenceLogIds,

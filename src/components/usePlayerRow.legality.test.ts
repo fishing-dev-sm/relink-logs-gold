@@ -49,6 +49,8 @@ describe("usePlayerRow legality colour", () => {
         show_flagged_builds: true,
         highlight_illegal_builds: true,
         streamer_mode: false,
+        gold_perfect_summons: true,
+        gold_perfect_overmasteries: false,
       });
     });
   });
@@ -73,6 +75,25 @@ describe("usePlayerRow legality colour", () => {
    * few rerolls can walk, and stays a cheat read. */
   it("colours the other long-odds report red", () => {
     expect(render([[perfectOvermasteries()], [], [], []]).current.legalityColor).toBe("red");
+  });
+
+  /** LOCAL FORK: with its checkbox on, all-maxed overmasteries reads gold
+   * like perfect summons do. */
+  it("colours perfect overmasteries gold when their checkbox is on", () => {
+    act(() => {
+      useMeterSettingsStore.setState({ gold_perfect_overmasteries: true });
+    });
+    expect(render([[perfectOvermasteries()], [], [], []]).current.legalityColor).toBe("yellow");
+  });
+
+  /** LOCAL FORK: with the summons checkbox off the report is hidden outright
+   * (upstream 1.12.10 behaviour) — a player it was the only thing against
+   * renders uncoloured, never red. */
+  it("colours nothing for perfect summons when their checkbox is off", () => {
+    act(() => {
+      useMeterSettingsStore.setState({ gold_perfect_summons: false });
+    });
+    expect(render([[perfectSummons()], [], [], []]).current.legalityColor).toBeUndefined();
   });
 
   it("leaves a clean player uncoloured", () => {

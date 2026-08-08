@@ -1,8 +1,16 @@
 import { describe, expect, it } from "vitest";
 
 import { LegalityFinding, LegalityFlaggedPlayer, LegalityPlayerFinding } from "@/types";
+import { GoldRules } from "@/violations";
 
-import { DEFAULT_FILTERS, applyFilters, auditRows, caseFor } from "./auditRows";
+import { DEFAULT_FILTERS, applyFilters, auditRows, caseFor, visibleFlaggedPlayers } from "./auditRows";
+
+/** Upstream's policy: perfect summons shown and gold, overmasteries red. The
+ * pre-existing cases below all run against it, so the page's default read
+ * stays pinned to upstream's. */
+const UPSTREAM: GoldRules = { perfectSummons: true, perfectOvermasteries: false };
+/** Perfect summons hidden, upstream-1.12.10 style. */
+const NO_SUMMONS: GoldRules = { perfectSummons: false, perfectOvermasteries: false };
 
 const sigilLevel: LegalityFinding = {
   rule: "sigilTraitLevel",
@@ -55,13 +63,13 @@ describe("auditRows", () => {
   /** The rail is one row per person: name and character. The violations belong
    * to the detail pane, which is the only place they are drawn. */
   it("gives each person one row", () => {
-    expect(auditRows([siunaus])).toHaveLength(1);
+    expect(auditRows([siunaus], UPSTREAM)).toHaveLength(1);
   });
 
   /** Name and character are drawn separately, so they arrive separately — the
    * page translates the character, this layer does not. */
   it("keeps the person's name and character apart", () => {
-    const [entry] = auditRows([siunaus]);
+    const [entry] = auditRows([siunaus], UPSTREAM);
     expect(entry.displayName).toBe("siunaus");
     expect(entry.characterType).toBe("Pl1000");
   });
@@ -71,8 +79,8 @@ describe("auditRows", () => {
   it("reads a purely lucky person as lucky, and anyone else as a cheat", () => {
     const lucky = player("lucky", [row(1, 100, perfect, 1)]);
 
-    expect(auditRows([lucky])[0].tone).toBe("lucky");
-    expect(auditRows([siunaus])[0].tone).toBe("cheat");
+    expect(auditRows([lucky], UPSTREAM)[0].tone).toBe("lucky");
+    expect(auditRows([siunaus], UPSTREAM)[0].tone).toBe("cheat");
   });
 });
 
@@ -82,7 +90,7 @@ describe("caseFor", () => {
    * wrightstone seen six times. Stating it once is the whole point; the tree
    * made you open all six and read the identical block each time. */
   it("states each distinct finding once across every fight", () => {
-    expect(caseFor(siunaus).evidence.map((row) => row.finding)).toEqual([sigilLevel, sigilPair, perfect]);
+    expect(caseFor(siunaus, UPSTREAM).evidence.map((row) => row.finding)).toEqual([sigilLevel, sigilPair, perfect]);
   });
 
   /** A build that CHANGED between fights is two different facts, so the values
@@ -91,7 +99,7 @@ describe("caseFor", () => {
     const relevelled = { ...sigilLevel, observed: { kind: "level" as const, value: 30 } };
     const changed = player("changed", [row(1, 100, sigilLevel), row(2, 200, relevelled)]);
 
-    expect(caseFor(changed).evidence).toHaveLength(2);
+    expect(caseFor(changed, UPSTREAM).evidence).toHaveLength(2);
   });
 
   /** THE pairing that keeps an accusation honest. A finding's subject is a slot
@@ -103,13 +111,13 @@ describe("caseFor", () => {
     const changed = player("changed", [row(1, 100, sigilLevel), row(2, 200, relevelled)]);
 
     // Newest first, and each finding keeps its own fight.
-    expect(caseFor(changed).evidence.map((row) => row.logId)).toEqual([2, 1]);
+    expect(caseFor(changed, UPSTREAM).evidence.map((row) => row.logId)).toEqual([2, 1]);
   });
 
   /** The same build in every fight is the normal case, and it must still cost
    * exactly one encounter to name. */
   it("needs one encounter when the build never changed", () => {
-    expect(caseFor(siunaus).evidenceLogIds).toEqual([10]);
+    expect(caseFor(siunaus, UPSTREAM).evidenceLogIds).toEqual([10]);
   });
 
   /** A changed build needs one encounter per build — the price of naming each
@@ -118,16 +126,16 @@ describe("caseFor", () => {
     const relevelled = { ...sigilLevel, observed: { kind: "level" as const, value: 30 } };
     const changed = player("changed", [row(1, 100, sigilLevel), row(2, 200, relevelled)]);
 
-    expect(caseFor(changed).evidenceLogIds).toEqual([2, 1]);
+    expect(caseFor(changed, UPSTREAM).evidenceLogIds).toEqual([2, 1]);
   });
 
   /** Every flagged fight is still listed — they are the links out to the log. */
   it("lists every flagged fight once, newest first", () => {
-    expect(caseFor(siunaus).fights.map((f) => f.logId)).toEqual([10, 11]);
+    expect(caseFor(siunaus, UPSTREAM).fights.map((f) => f.logId)).toEqual([10, 11]);
   });
 
   it("carries the quest each fight was, for the page to name", () => {
-    expect(caseFor(siunaus).fights[0].questId).toBe(401);
+    expect(caseFor(siunaus, UPSTREAM).fights[0].questId).toBe(401);
   });
 
   /** The fight list is the case's table of contents, so every fight has to name
@@ -135,7 +143,7 @@ describe("caseFor", () => {
    * fight's entry has no entry of its own — it must point at the one that
    * absorbed it rather than at nothing, or most of the contents are dead. */
   it("points a deduplicated fight at the entry that absorbed it", () => {
-    const fights = caseFor(siunaus).fights;
+    const fights = caseFor(siunaus, UPSTREAM).fights;
 
     expect(fights.map((f) => f.logId)).toEqual([10, 11]);
     // Fight 11 carries only the repeated sigil-level finding, whose evidence is
@@ -148,27 +156,50 @@ describe("caseFor", () => {
     const relevelled = { ...sigilLevel, observed: { kind: "level" as const, value: 30 } };
     const changed = player("changed", [row(1, 100, sigilLevel), row(2, 200, relevelled)]);
 
-    expect(caseFor(changed).fights.map((f) => f.entryLogId)).toEqual([2, 1]);
+    expect(caseFor(changed, UPSTREAM).fights.map((f) => f.entryLogId)).toEqual([2, 1]);
   });
 
   /** Two sigil rules across two fights are still one "Impossible Sigil" — the
    * chips say what is wrong with the build, not how often it was measured. */
   it("summarises what the person is flagged for, each violation once", () => {
-    expect(caseFor(siunaus).violations).toEqual(["impossibleSigil", "perfectSummons"]);
+    expect(caseFor(siunaus, UPSTREAM).violations).toEqual(["impossibleSigil", "perfectSummons"]);
   });
 
   /** The case reads the same tone as the rail: the pane's heading and the row
    * that opened it must never disagree about the same person. */
   it("carries the case's tone, matching the rail's", () => {
-    expect(caseFor(siunaus).tone).toBe("cheat");
-    expect(caseFor(player("lucky", [row(1, 100, perfect, 1)])).tone).toBe("lucky");
-    expect(caseFor(player("empty", [])).tone).toBeUndefined();
+    expect(caseFor(siunaus, UPSTREAM).tone).toBe("cheat");
+    expect(caseFor(player("lucky", [row(1, 100, perfect, 1)]), UPSTREAM).tone).toBe("lucky");
+    expect(caseFor(player("empty", []), UPSTREAM).tone).toBeUndefined();
   });
 
   /** A person with no findings has no fight to read gear from, and the page
    * must not fetch log `undefined`. */
   it("has no evidence log when there is nothing to show", () => {
-    expect(caseFor(player("empty", [])).evidenceLogIds).toEqual([]);
+    expect(caseFor(player("empty", []), UPSTREAM).evidenceLogIds).toEqual([]);
+  });
+});
+
+describe("visibleFlaggedPlayers", () => {
+  /** With the summons checkbox off, a person flagged ONLY for perfect summons
+   * leaves the audit entirely — the same list upstream 1.12.10 (which never
+   * records the report) would show. */
+  it("drops a person whose only finding is now hidden", () => {
+    const lucky = player("lucky", [row(1, 100, perfect, 1)]);
+    expect(visibleFlaggedPlayers([lucky, siunaus], NO_SUMMONS).map((p) => p.displayName)).toEqual(["siunaus"]);
+  });
+
+  it("keeps the person but cuts the hidden finding from their case", () => {
+    const [kept] = visibleFlaggedPlayers([siunaus], NO_SUMMONS);
+    expect(kept.findings.map((r) => r.finding.rule)).not.toContain("summonPerfectCount");
+    expect(caseFor(kept, NO_SUMMONS).violations).toEqual(["impossibleSigil"]);
+  });
+
+  it("keeps everyone and everything under the upstream policy", () => {
+    const lucky = player("lucky", [row(1, 100, perfect, 1)]);
+    const kept = visibleFlaggedPlayers([lucky, siunaus], UPSTREAM);
+    expect(kept).toHaveLength(2);
+    expect(kept[1].findings).toHaveLength(4);
   });
 });
 

@@ -2,8 +2,9 @@ import { Stack, Text, Tooltip } from "@mantine/core";
 import { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 
+import useGoldRules from "@/hooks/useGoldRules";
 import { LegalityFinding } from "@/types";
-import { TONE_COLOR, findingsTone } from "@/violations";
+import { TONE_COLOR, findingsTone, visibleFindings } from "@/violations";
 
 import { FindingDetail } from "./FindingDetail";
 
@@ -61,11 +62,16 @@ export const LegalityMark = ({
   title?: string;
   children: ReactNode;
 }) => {
-  const tone = findingsTone(findings);
+  const gold = useGoldRules();
+  // The gold rules can HIDE a finding (perfect summons with their checkbox
+  // off), not just recolour it — filter before judging, so a player whose
+  // only report just vanished renders exactly as unjudged.
+  const visible = visibleFindings(findings, gold);
+  const tone = findingsTone(visible, gold);
   if (tone === undefined) return <>{children}</>;
 
   return (
-    <Tooltip multiline w={340} withArrow color="dark" label={<FindingsExplanation findings={findings} title={title} />}>
+    <Tooltip multiline w={340} withArrow color="dark" label={<FindingsExplanation findings={visible} title={title} />}>
       {/* `span` keeps the wrapped node's own layout: these wrap table cells,
           headings and inline text alike, so the mark must not introduce a box. */}
       <Text span c={TONE_COLOR[tone]} inherit style={{ cursor: "help" }}>
@@ -81,10 +87,11 @@ export const LegalityMark = ({
  * deliberately, one log at a time, and are not on screen over the game. */
 export const LegalityPlayerName = ({ findings, children }: { findings: LegalityFinding[]; children: ReactNode }) => {
   const { t } = useTranslation();
+  const gold = useGoldRules();
 
   // A gold name gets a gold heading: "this build was flagged" over a mark that
   // means "extremely lucky" would take back what the colour just said.
-  const tone = findingsTone(findings);
+  const tone = findingsTone(visibleFindings(findings, gold), gold);
   const title =
     tone === undefined ? undefined : t(tone === "lucky" ? "ui.legality.player-lucky" : "ui.legality.player-flagged");
 

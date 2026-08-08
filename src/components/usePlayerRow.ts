@@ -1,10 +1,11 @@
 import { useMemo, useState } from "react";
 import { useShallow } from "zustand/react/shallow";
 
+import useGoldRules from "@/hooks/useGoldRules";
 import { useMeterSettingsStore } from "@/stores/useMeterSettingsStore";
 import { ComputedPlayerState, LegalityFinding, MeterColumns, PlayerData, visibleColumns } from "@/types";
 import { PLAYER_COLORS, computeSupPercentage, humanizeNumbers, resolvePlayerColor } from "@/utils";
-import { TONE_COLOR, findingsTone } from "@/violations";
+import { TONE_COLOR, findingsTone, visibleFindings } from "@/violations";
 
 export type ColumnValue = {
   value: string | number;
@@ -61,10 +62,12 @@ export const usePlayerRow = (
   // narrower choice under it, and on streamer mode — which hides names
   // precisely so nothing about a player reaches the stream.
   //
-  // Red for a cheat; gold when everything against the build is luck (a full
-  // set of perfect summons). The gates apply to both — gold is a nicer thing
-  // to say about someone, but it is still saying something.
-  const tone = findingsTone(legality?.[partySlotIndex] ?? []);
+  // Red for a cheat; gold when everything against the build is luck (which
+  // long-odds reports count as luck is the user's gold-rule setting). The
+  // gates apply to both — gold is a nicer thing to say about someone, but it
+  // is still saying something.
+  const gold = useGoldRules();
+  const tone = findingsTone(visibleFindings(legality?.[partySlotIndex] ?? [], gold), gold);
   const legalityColor =
     show_flagged_builds && highlight_illegal_builds && !streamer_mode && tone !== undefined
       ? TONE_COLOR[tone]
