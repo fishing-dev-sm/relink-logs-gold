@@ -82,7 +82,7 @@ const useHeaderTokens = (
   return {
     tokens: {
       // eslint-disable-next-line i18next/no-literal-string -- app name, never translated
-      app: "Relink Logs",
+      app: "Relink Logs GOLD",
       version,
       damage: hasDamage ? `${totalDamage}${damageUnit}` : "",
       dps: hasDamage ? `${dps}${dpsUnit}` : "",

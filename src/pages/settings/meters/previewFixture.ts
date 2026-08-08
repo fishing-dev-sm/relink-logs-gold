@@ -71,7 +71,7 @@ export const PREVIEW_PARTY: Array<PlayerData | null> = SHARES.map(makePartyMembe
 /** Header token values matching the fixture encounter — a boss fight in
  * progress, so every token has something to show. */
 export const PREVIEW_HEADER_TOKENS = {
-  app: "Relink Logs",
+  app: "Relink Logs GOLD",
   version: "1.0.0",
   damage: "9.8m",
   dps: "61.2k",
