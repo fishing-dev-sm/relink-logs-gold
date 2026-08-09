@@ -5,6 +5,26 @@ version without a section here, and the section body becomes the GitHub
 release body — which the in-app update prompt shows as patch notes. Renders
 markdown in the app.
 
+## 1.12.12-9000
+
+### Notes
+
+- Merged upstream 1.12.11 and 1.12.12: the opt-in **BETA** logs UI, multiselect analysis filters, and the zh-CN translation for the beta page. The gold-rule settings (Settings → General) are unchanged.
+
+## 1.12.12
+
+### Language
+
+- Added zh-CN translation for the beta log UI page [credit to Souma-Sumire](https://github.com/Souma-Sumire)
+
+## 1.12.11
+
+### Features
+
+- An opt-in **BETA** version of the new logs UI is available to try out
+  - Some of the functionality is incomplete
+  - The viewer is not optimized. When viewing longer fights ( ex. infinity zegalith ), it will be a bit slow
+
 ## 1.12.10-9001
 
 ### Notes
