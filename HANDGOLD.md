@@ -12,10 +12,11 @@
 - **fork 的工作分支**：本地 `gold-rule-toggles`,tracking `fork/dev`
   - 因为本地/远端分支名不同，裸 `git push` 会被 push.default=simple 拒绝；用 `git push fork gold-rule-toggles:dev`，或设一次 `git config push.default upstream`
 
-## 已发布状态（2026-08-08）
+## 已发布状态（2026-08-09 更新）
 
-- 已发 release:`1.12.10-9000`（功能版）、`1.12.10-9001`（GOLD 品牌版，待发/刚发）
-- fork dev 顶端提交序列（旧→新）:
+- 已发 release:`1.12.10-9000`（功能版）、`1.12.10-9001`（GOLD 品牌版）
+- **已合并上游 1.12.11 + 1.12.12**（合并提交 `9806be7`，版本 `1.12.12-9000`,4 个版本文件 + CHANGELOG 已更新，检查通过：tsc 干净，vitest 失败集与上游基线完全一致，cargo check 通过）,**待 dispatch Gold Release**
+- 合并时 fork dev 顶端提交序列（旧→新）:
   1. `28f86e9` legality：恢复完美召唤兽报告（RULES_VERSION 10）
   2. `36a85ce` 金色规则开关化（两个 checkbox)
   3. `8322e4a` fork README
