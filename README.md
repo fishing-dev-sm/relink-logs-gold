@@ -13,16 +13,18 @@ The built-in legality audit flags builds that **cannot exist** — impossible si
 - a **full set of perfect summons** (every bonus at the top of its roll window)
 - **all-maxed overmasteries** (every overmastery line at its maximum)
 
-These are not impossible — and the game's own drop tables put a price on exactly how not-impossible they are:
+These are not impossible — and the game's own drop tables put a price on exactly how not-impossible they are. A fair price has to account for farming, though: nobody rolls exactly once. So each report is priced twice — per single draw, and per realistic grind:
 
-| Report | Odds of a legitimate roll | Scale |
+| Report | Per single draw | Per realistic grind |
 | --- | --- | --- |
 | A single perfect summon | 1 in 49 to 1 in 407 | ordinary — 42 of 72 players in a production census owned at least one, so the audit does not even report it |
-| A full set of four perfect summons | 1 in 400 million, at the reading most generous to the player (1 in 27.5 billion at the strictest) | on the order of a national-lottery jackpot |
-| Three maxed stun overmasteries | 1 in 442 million | the same lottery-jackpot order |
-| **Both on one build** | **1 in 176 quintillion to 1 in 12 sextillion** | picking one marked grain of sand out of every beach on Earth |
+| A full set of four perfect summons | 1 in 400 million at the reading most generous to the player (1 in 27.5 billion at the strictest) | ~1,600 boss runs on average, 99.8% after 5,000 — reachable by a dedicated farmer within a season or two |
+| Three maxed stun overmasteries | 1 in 442.75 million | the real wall — the three stun ids exist only in the Lv1 meditation pool, prediction buys no shortcut, and a million meditations still only buy 1 in 443 |
+| **Both on one build** | **1 in 176 quintillion to 1 in 12 sextillion** | ≈ your Lv1 meditation count, out of 442.75 million — the summons grind out near-certainly, so the overmasteries decide |
 
-Each report on its own is lottery-jackpot odds — a player could, in principle, get there honestly. Both together leave the realm of luck altogether: there are fewer stars in the Milky Way than one-in-however-many-sextillion. And that is exactly why the information matters. A player whose build is *only* flagged this way is either the luckiest farmer alive, or not farming at all. Upstream has swung between the two extremes: 1.12.9 marked perfect summons gold ("Blessed by RNG"), 1.12.10 stopped reporting them entirely.
+(The full derivation — per-family drop-table numbers and the binomial farming model — lives in [docs/perfect-odds.html](./docs/perfect-odds.html).)
+
+The per-draw column makes even four summons sound like a lottery jackpot, but that is the price of rolling exactly once — it says nothing about a farmer who rolls hundreds of times and equips the best. Priced per grind, the two reports differ in kind: perfect summons are the achievable half (the census watches real players get there), while the overmastery set stays out of reach at any realistic meditation volume. A build carrying both is roughly one-in-(your Lv1 meditation count, over 442.75 million) — rare even among the hardest farmers, but not a miracle. And that is exactly why the information matters. A player whose build is *only* flagged this way is either an uncommonly lucky farmer, or not farming at all. Upstream has swung between the two extremes: 1.12.9 marked perfect summons gold ("Blessed by RNG"), 1.12.10 stopped reporting them entirely.
 
 This fork's position: **the mark is necessary, but the verdict is yours.** Gold states a fact — "this outcome is statistically near-impossible" — it does not accuse. Whether perfect summons deserve to be shown at all, and whether all-maxed overmasteries deserve the same gold, are judgment calls that reasonable players disagree on. So they are settings, not policy:
 

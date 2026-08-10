@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GBFR 极品概率表 — 按"刷 N 局"口径重新计算</title>
+<style>
+  :root {
+    --gold: #8a6d1d;
+    --gold-strong: #6b5410;
+    --bg: #faf7ef;
+    --panel: #ffffff;
+    --line: #ddd3b8;
+    --text: #2e2a1e;
+    --muted: #7a725c;
+    --head-bg: #f3ecd7;
+    --both-bg: #f7efdb;
+    --code-bg: #f3ecd7;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --gold: #d4af37;
+      --gold-strong: #d4af37;
+      --bg: #14110a;
+      --panel: #1e1a10;
+      --line: #3a3220;
+      --text: #e8e2d0;
+      --muted: #a89f86;
+      --head-bg: #2a2415;
+      --both-bg: #26200f;
+      --code-bg: #2a2415;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    padding: 2rem 1rem;
+    background: var(--bg);
+    color: var(--text);
+    font-family: "PingFang SC", "Microsoft YaHei", "Noto Sans CJK SC", sans-serif;
+    line-height: 1.7;
+  }
+  main { max-width: 960px; margin: 0 auto; }
+  h1 {
+    font-size: 1.5rem;
+    color: var(--gold-strong);
+    border-bottom: 2px solid var(--gold);
+    padding-bottom: .5rem;
+  }
+  h2 { font-size: 1.1rem; color: var(--gold-strong); margin-top: 2.2rem; }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 1rem 0;
+    background: var(--panel);
+  }
+  th, td {
+    border: 1px solid var(--line);
+    padding: .6rem .8rem;
+    text-align: left;
+    vertical-align: top;
+  }
+  th {
+    background: var(--head-bg);
+    color: var(--gold-strong);
+    white-space: nowrap;
+  }
+  td.num, th.num {
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+    text-align: right;
+  }
+  tr.hl td { background: var(--both-bg); }
+  .unit-note, .cap { color: var(--muted); font-size: .9rem; }
+  .notes {
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    padding: 1rem 1.2rem;
+    font-size: .92rem;
+  }
+  .notes li { margin: .4rem 0; }
+  code {
+    background: var(--code-bg);
+    padding: .1em .35em;
+    border-radius: 4px;
+    font-size: .9em;
+  }
+  .conclusion {
+    border-left: 4px solid var(--gold);
+    background: var(--both-bg);
+    padding: .8rem 1.2rem;
+    margin: 1.5rem 0;
+  }
+</style>
+</head>
+<body>
+<main>
+  <h1>GBFR 极品概率表（刷取口径）</h1>
+  <p>数据来自游戏内置掉落表（<code>summon-legality.json</code> / <code>overmastery-tables.json</code>）。
+     游戏可以无限重刷，所以本表不按"一把出"计算，而是回答两个对玩家真正有意义的问题：
+     <strong>平均要刷多少次</strong>（期望），以及<strong>刷了 N 次之后达成的概率</strong>（二项分布）。</p>
+
+  <h2>一、召唤石：平均要刷多少局</h2>
+  <p class="cap">假设每刷一次对应 Boss 获得一次独立抽取，并一直盯着目标召唤石刷。
+     "容易家族"= Behemoth III / Vrazarek（单个极品 1/48.9）；
+     "困难家族"= Rolan / Lilith / Lucilius / Beelzebub（单个极品 1/407.4）。</p>
+  <table>
+    <thead>
+      <tr>
+        <th>目标</th>
+        <th class="num">平均局数（期望）</th>
+        <th class="num">50% 把握所需局数</th>
+        <th class="num">90% 把握所需局数</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr><td>1 个极品</td><td class="num">49 ~ 407 局</td><td class="num">34 ~ 283 局</td><td class="num">112 ~ 937 局</td></tr>
+      <tr><td>2 个极品</td><td class="num">98 ~ 815 局</td><td class="num">82 ~ 684 局</td><td class="num">189 ~ 1,584 局</td></tr>
+      <tr><td>3 个极品</td><td class="num">147 ~ 1,222 局</td><td class="num">131 ~ 1,090 局</td><td class="num">259 ~ 2,167 局</td></tr>
+      <tr class="hl"><td><strong>4 个极品（金色报告的触发线）</strong></td><td class="num">196 ~ 1,630 局</td><td class="num">180 ~ 1,496 局</td><td class="num">325 ~ 2,720 局</td></tr>
+    </tbody>
+  </table>
+  <p class="cap">区间下限 = 全部来自容易家族；上限 = 全部来自困难家族。
+     混合套装（2 容易 + 2 困难）平均约 <strong>913 局</strong>。
+     结论：<strong>4 个极品召唤石是"肝就能到"的东西</strong> —— 对终局玩家，一两千局 Boss 只是一个赛季的刷量，
+     这也是普查里 72 人中 42 人有极品召唤石的原因。</p>
+
+  <h2>二、召唤石：刷 N 局后的达成概率（最严格口径：全困难家族）</h2>
+  <table>
+    <thead>
+      <tr><th>已刷局数</th><th class="num">≥1 个极品</th><th class="num">≥2 个</th><th class="num">≥3 个</th><th class="num">≥4 个</th></tr>
+    </thead>
+    <tbody>
+      <tr><td class="num">500 局</td><td class="num">70.7%</td><td class="num">34.7%</td><td class="num">12.6%</td><td class="num">3.6%</td></tr>
+      <tr><td class="num">1,000 局</td><td class="num">91.4%</td><td class="num">70.4%</td><td class="num">44.5%</td><td class="num">23.3%</td></tr>
+      <tr><td class="num">2,000 局</td><td class="num">99.3%</td><td class="num">95.7%</td><td class="num">86.8%</td><td class="num">72.2%</td></tr>
+      <tr class="hl"><td class="num">5,000 局</td><td class="num">≈100%</td><td class="num">≈100%</td><td class="num">≈100%</td><td class="num">99.8%</td></tr>
+    </tbody>
+  </table>
+  <p class="cap">二项分布 P(≥k) = 1 − Σ<sub>i&lt;k</sub> C(N,i)·pⁱ·(1−p)^(N−i)，p = 1/407.4。</p>
+
+  <h2>三、上限突破：三个满级晕眩词条</h2>
+  <p class="cap">为什么是 Lv1 而不是大家常刷的 Lv3：<strong>三个 Stun Power Up 词条只存在于 Lv1（700 MSP）池</strong>，
+     Lv2 / Lv3 池各只有其中一个 —— 所以"三个晕眩全满"在物理上只可能由 Lv1 冥想产出，看到它就自动证明了来源。
+     正常玩家在 Lv3 能刷到的"完美"（4 个满级实用词条）单次概率是 1/62,872，配合预测器完全够得着，
+     因此审计早已不再报告它 —— "三晕眩"是唯一真正够不着的完美形态。
+     单次 Lv1 冥想抽出它的概率为 20/8855 × 0.01³ = 1/4.4275 亿，
+     且预测器帮不上忙 —— 每次抽取都必须真花 700 MSP 推进随机流。</p>
+  <table>
+    <thead>
+      <tr><th>已冥想次数（Lv1）</th><th class="num">达成概率</th><th class="num">相当于</th></tr>
+    </thead>
+    <tbody>
+      <tr><td class="num">1 万次</td><td class="num">0.0023%</td><td class="num">1 / 44,275</td></tr>
+      <tr><td class="num">10 万次</td><td class="num">0.023%</td><td class="num">1 / 4,428</td></tr>
+      <tr><td class="num">100 万次</td><td class="num">0.23%</td><td class="num">1 / 443</td></tr>
+      <tr><td class="num">1,000 万次</td><td class="num">2.23%</td><td class="num">1 / 45</td></tr>
+      <tr class="hl"><td class="num">平均需要（期望）</td><td class="num">—</td><td class="num"><strong>4.4275 亿次</strong>（50% 把握需 3.07 亿次）</td></tr>
+    </tbody>
+  </table>
+  <p class="cap">MSP 不是无限的：即使每天刷 1,000 次冥想，100 万次也要近 3 年。这一栏才是真正的天堑。</p>
+
+  <h2>四、组合：4 极品召唤石 + 上限突破全极品</h2>
+  <div class="conclusion">
+    召唤石刷几千局后接近必然（5,000 局 99.8%），所以组合概率几乎完全由上限突破决定：<br>
+    <strong>P（双极品） ≈ 你的 Lv1 冥想次数 ÷ 4.4275 亿</strong><br>
+    例：刷了 5,000 局 Boss + 10 万次冥想的重度玩家，双极品概率 ≈ 99.8% × 0.023% ≈ <strong>1 / 4,400</strong>。
+    这不是"17.6 京分之一的奇迹"，而是"肝帝里每几千人出一个"的水平。
+    反过来说，一个双极品玩家既可能是万里挑一的幸运肝帝，也可能根本没在刷 ——
+    这正是审计把它标成金色（"统计上近乎不可能，但请你自行判断"）而不是红色的原因。
+  </div>
+
+  <h2>附录：单次掉落概率（"一把出"的旧口径，仅供参考）</h2>
+  <p class="cap">以下数字是"随机掉落一次恰好得到该配置"的概率，<strong>不代表</strong>长期刷取下拥有它的难度，请勿单独引用。</p>
+  <table>
+    <thead>
+      <tr><th>情况</th><th class="num">最宽松读法</th><th class="num">最严格读法</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>1 个召唤石 100% 极品</td><td class="num">1 / 49</td><td class="num">1 / 407</td></tr>
+      <tr><td>2 个召唤石 100% 极品</td><td class="num">1 / 2,390</td><td class="num">1 / 16.6 万</td></tr>
+      <tr><td>3 个召唤石 100% 极品</td><td class="num">1 / 97.4 万</td><td class="num">1 / 6,762 万（≈0.68 亿）</td></tr>
+      <tr><td>4 个召唤石 100% 极品</td><td class="num">1 / 4 亿</td><td class="num">1 / 275.5 亿</td></tr>
+      <tr class="hl"><td>4 极品召唤石 + 上限突破全极品</td><td class="num">1 / 17.6 京（= 17.6 亿亿）</td><td class="num">1 / 1,220 京（= 0.12 垓）</td></tr>
+    </tbody>
+  </table>
+  <p class="unit-note">计数单位（万进制）：万 = 10⁴，亿 = 10⁸，兆 = 10¹²，京 = 10¹⁶（= 1 亿亿），垓 = 10²⁰（= 1 万京）。相邻单位相差一万倍。</p>
+
+  <h2>口径说明</h2>
+  <div class="notes">
+    <ul>
+      <li><strong>"极品"召唤石的定义</strong>（与审计规则一致）：可掉落（rolled）的六大终局 Boss 召唤石
+        —— Rolan / Lilith / Lucilius / Beelzebub / Vrazarek Firewyrm III / Behemoth III ——
+        主词条和装备加成同时落在各自等级窗口的顶端，且加成是玩家会刷的五类词条之一
+        （攻击力、晕眩值、三类伤害上限）。</li>
+      <li><strong>刷取模型</strong>：每次 Boss 掉落视为一次独立伯努利试验，p 取自游戏掉落表
+        （容易家族 1/48.9，困难家族 1/407.4）。刷 N 次集齐至少 k 个的概率用二项分布尾部计算；
+        "平均局数" = k ÷ p（负二项分布期望）。混合套餐按各家族分别刷取、次数相加。</li>
+      <li><strong>模型的善意</strong>：此模型假设你只为极品而刷、且掉落全部保留，
+        已经是对玩家最有利的读法；真实玩家还会顺路出货，只会比表中更快。</li>
+      <li><strong>上限突破</strong>：三个满级晕眩 = 审计报告的唯一触发形态，q = 20/8855 × 0.01³。
+        N 次后概率 = 1 − (1−q)^N ≈ N·q（N 远小于 4.4 亿时）。</li>
+      <li><strong>为什么"一把出"口径不公平</strong>：它假设玩家只抽一次。fork 自己的代码注释也承认这一点
+        —— 单抽定价"对一个刷了几百次再装备最好那颗的农民视而不见"
+        （<code>src-tauri/src/legality/summons.rs</code> 模块文档），这正是审计后来从报告里删除单抽概率的原因。</li>
+    </ul>
+  </div>
+</main>
+</body>
+</html>
