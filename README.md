@@ -2,6 +2,14 @@
 
 [![GitHub License](https://img.shields.io/github/license/fishing-dev-sm/relink-logs-gold)](./LICENSE)
 
+# Windows Defender / Virus
+
+**There is no virus**, it is an issue with some of the modules used for Linux support that were incorrectly included in the Windows bundle
+
+If Windows Defender is flagging relink-logs as a virus, you likely are running version 1.12.12. Updating to version 1.12.13 should solve your issue
+
+## Description
+
 Overlay DPS parser/meter for Granblue Fantasy: Relink.
 
 **This repository is a fork of [villith/relink-logs](https://github.com/villith/relink-logs).** It tracks upstream's `dev` branch and adds exactly one divergence: user-configurable "gold rules" for the legality audit (see below). Everything else — features, fixes, releases — comes from upstream. The fork's own manual (versioning, releasing, upstream-tracking) lives in [GOLDME.md](./GOLDME.md). Relink Logs itself was built upon [false-spring/gbfr-logs](https://github.com/false-spring/gbfr-logs), which is no longer maintained, and on the reverse engineering from [nyaoouo/GBFR-ACT](https://github.com/nyaoouo/GBFR-ACT).
@@ -77,7 +85,7 @@ Notes:
 - The overlay uses X11 (via XWayland on Wayland desktops). Always-on-top and
   clickthrough behavior can vary by compositor; X11 sessions are the most
   reliable. If the overlay hides behind the game, see the FAQ entry
-- The hook file installed into the game folder is the same `hook.dll` Windows uses, renamed to `dinput8.dll` (unsigned in this fork's builds — see Installation).
+- The hook file installed into the game folder is the `hook.dll` bundled with the AppImage, renamed to `dinput8.dll`. It is a Proton-specific build: it carries the `DirectInput8Create` proxy export and the localhost socket that Wine needs, neither of which ships in the Windows build (unsigned in this fork's builds — see Installation).
   - Use **Remove hook** in Settings to delete it
 
 ## Found a translation problem or a bug?

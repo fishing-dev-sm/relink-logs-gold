@@ -237,6 +237,23 @@ export type SkillTargetState = {
   totalDamage: number;
 };
 
+/** The LANDING view of one skill: an echo counted as part of the hit that
+ * caused it rather than a hit of its own (mirrors the Rust
+ * `MergedSkillMeasure`).
+ *
+ * For a direct action, `hits` counts landings and the amounts include their
+ * echoes. For an echo action, this describes its UNCLAIMED residue only — a
+ * claimed echo's damage already sits on its trigger, so a fully-claimed echo
+ * row is all zeros. */
+export type MergedSkillMeasure = {
+  hits: number;
+  damage: number;
+  min: number | null;
+  max: number | null;
+  /** The echo damage inside `damage`. */
+  supplementary: number;
+};
+
 export type SkillState = {
   /** ActionType of the skill */
   actionType: ActionType;
@@ -250,11 +267,9 @@ export type SkillState = {
   maxDamage: number | null;
   /** Total damage of the skill */
   totalDamage: number;
-  /** Skybound Arts gauge this skill generated. Local player only — a remote
-   * member's gauge is synced rather than granted by a hit the hook can see, so
-   * their rows are 0 and the table must say so rather than ranking them.
-   * Optional: a backend older than the field sends nothing (dev HMR skew). */
+  merged?: MergedSkillMeasure;
   sbaGenerated?: number;
+  sbaInferred?: number;
   /** Total stun value of the skill hits */
   totalStunValue: number;
   /** Maximum recorded stun value of the skill */
@@ -423,12 +438,34 @@ export type WireGroupQuery = {
 /** One row's totals in a `GroupAggregate` (mirrors the Rust `GroupMeasure`). */
 export type GroupMeasure = { amount: number; hits: number; min: number | null; max: number | null };
 
+/** The same row under the LANDING model, where an echo is part of the hit that
+ * caused it rather than a hit of its own (mirrors the Rust `MergedMeasure`).
+ *
+ * For a direct action, `hits` counts landings and the amounts include their
+ * echoes. For an echo action, this describes its UNCLAIMED residue only —
+ * a claimed echo's damage already sits on its trigger. */
+export type MergedMeasure = GroupMeasure & { supplementary: number };
+
 /** One (filters × groupBy) row/band pair from `aggregate_groups` (mirrors the
  * Rust `GroupAggregate`): the table (`key` + `measure`) and the chart
  * (`key` + `series`) come from the same grouping, so the two can never
  * disagree. `series` is a whole-fight per-bucket band, same buckets as
- * `dpsChart` — the view slices it client-side. */
-export type GroupAggregate = { key: GroupKey; measure: GroupMeasure; series: number[] };
+ * `dpsChart` — the view slices it client-side, and it stays the RAW view.
+ * `merged` is the same totals under the supplementary collapse; the toggle
+ * picks between them, which is what keeps flipping it free of a refetch.
+ *
+ * REQUIRED, unlike `SkillState.merged`, which is optional with a raw fallback
+ * behind it. Both mirror non-`Option` Rust fields, so the same backend skew
+ * would reach both — but they fail differently. An aggregate arriving without
+ * it throws in `addSplit` on the first `+=`, loudly, at the version boundary
+ * where the skew belongs; a `SkillState` without it would sum to zero and draw
+ * a row of confident zeros. Only the quiet failure earns a guard. */
+export type GroupAggregate = {
+  key: GroupKey;
+  measure: GroupMeasure;
+  merged: MergedMeasure;
+  series: number[];
+};
 
 /** One key's WHOLE-FIGHT total, ignoring everything the query narrows in time
  * (mirrors the Rust `GroupReference`).
@@ -453,7 +490,12 @@ export type SbaSourceState = {
     | "questStart"
     | "perfectDodge"
     | "site"
-    | "unknown";
+    | "unknown"
+    // Deduced by the parser from the log rather than read by the hook — the
+    // only causes available for a remote member, whose grant frames never run
+    // on this machine.
+    | "inferredChainGrant"
+    | "inferredDamageTaken";
   id: number | null;
   generated: number;
 };
@@ -625,6 +667,13 @@ export type PlayerData = {
   stats: RecordStats | null;
   /** Equipped weapon save-row snapshot (v2.0.2 identity recovery); null on older logs. */
   weaponState: WeaponState | null;
+  /** The Mastery (AP-tree) damage-cap total per attack class, read from the
+   * game's own resolved limit-bonus store — table units (684 = +684%). Already
+   * fused inside the record cap-up totals, so it itemizes them, never adds to
+   * them. Null on logs recorded before the capture shipped. */
+  limitBonusCapNormal: number | null;
+  limitBonusCapSkill: number | null;
+  limitBonusCapSba: number | null;
   isOnline: boolean;
   weaponInfo: WeaponInfo | null;
   overmasteryInfo: OvermasteryInfo | null;
@@ -883,6 +932,19 @@ export type SBAEvent = [
 
 export type DeathEvent = [number, { OnDeathEvent: { actor_index: number; death_counter: number } }];
 
+/** One status the attacker was carrying when a hit landed, as
+ * `DamageEvent.source_statuses` reports it. Mirrors `protocol::SourceStatus`,
+ * so — like the rest of a `Message` payload — the fields stay snake_case.
+ *
+ * `status_id` is the same `status.tbl` id the `StatusApply`/`StatusRemove`
+ * stream carries, so a snapshot entry and an interval name the same effect.
+ * `stacks` follows the same rule as `StatusApply.stacks`: a real count for the
+ * effects the game marks as levelled, 1 for everything else. */
+export type SourceStatus = {
+  status_id: number;
+  stacks: number;
+};
+
 /** One actor as a damage event reports it. `parent_index` is what an attribution
  * reads — a summon's hit belongs to the player who called it. */
 type LogEventActor = {
@@ -913,6 +975,36 @@ export type LogEventPayload =
         damage: number;
         flags: number;
         action_id: ActionType;
+        /** The game's own cap for this hit. `null` on old logs. */
+        damage_cap: number | null;
+        /** Pre-cap base damage, before `min(base, cap)` clamps it. */
+        base_damage: number | null;
+        /** The move's attack rate — what community sheets call MV. */
+        attack_rate: number | null;
+        stun_value: number | null;
+        target_current_hp: number | null;
+        target_max_hp: number | null;
+        /** Attack-class bits. `0x40000` Skybound Art beats `0x10000` Skill;
+         * neither means Normal. Picks which of the player's three cap-ups
+         * applied. `null` on old logs. */
+        class_flags: number | null;
+        /** The ATTACKER's own HP when the hit was registered — read from the
+         * same `ExHp` component the target pair comes from, and read BEFORE the
+         * game's damage call, because that is when the hit's cap was computed.
+         * What an HP-gated cap trait ("while at 75% HP or more", "when at 45000
+         * HP or less") has to be judged against. `null` on old logs, on
+         * non-player attackers, and when the read fails its sanity checks. */
+        source_current_hp: number | null;
+        /** The attacker's max HP, for the fraction. `null` alongside
+         * `source_current_hp` — the two are read as one pair. */
+        source_max_hp: number | null;
+        /** Every status the attacker held at that moment, with its stack count.
+         *
+         * `null` and `[]` are DIFFERENT: `null` is "not captured" (an old log,
+         * a summon or enemy attacker), `[]` is "captured, and the attacker held
+         * nothing". A conditional cap source may only be reported as inactive
+         * on the second — on the first it is unresolved. */
+        source_statuses: SourceStatus[] | null;
       };
     }
   | { OnDeathEvent: { actor_index: number; death_counter: number } }
@@ -953,7 +1045,18 @@ export type LogEvent = [number, LogEventPayload];
 /** Mirrors the Rust `EventPage`. `total` can exceed `events.length` — the
  * frontend asks for a capped page, and a log past the cap is truncated VISIBLY
  * (see EventsTab), never silently. */
-export type EventPage = { events: LogEvent[]; total: number };
+export type EventPage = {
+  events: LogEvent[];
+  total: number;
+  capUp: Record<string, PlayerCapUp>;
+  suppPairs: Record<number, number>;
+};
+
+export type PlayerCapUp = {
+  normal: number | null;
+  skill: number | null;
+  sba: number | null;
+};
 
 /** Toolbox / Synthesis Helper — mirrors src-tauri/src/synthesis/mod.rs. */
 export type SynthesisSigil = {

@@ -1,6 +1,11 @@
 [package]
 name = "hook"
-version = "0.1.0"
+# Hand-bumped whenever the shipped hook's behavior changes (src-hook/ or the
+# game-reader/ code it compiles in). The app treats a mapped hook reporting a
+# different version as OutOfDate even on a matching wire, and this is the
+# version stamped into the DLL's resource block — so an unbumped change ships
+# a hook indistinguishable from the previous one.
+version = "0.2.0"
 edition = "2021"
 
 [lib]
@@ -23,6 +28,15 @@ fullassist = ["dep:serde_json"]
 # control-channel `Eject` request, so the app can FreeLibrary + re-inject a
 # rebuilt DLL without a game restart. Never built for release.
 eject = []
+# Proton/Wine support, and NOTHING else: the dinput8 proxy export (proxy.rs)
+# plus the localhost-TCP transport the event/toolbox/control channels fall
+# back to under Wine. Off for the Windows DLL on purpose — see proxy.rs and
+# transport.rs. That build is injected into the game process, and the three
+# things this feature adds (a `DirectInput8Create` export, a `LoadLibraryW`
+# on a hardcoded system32 path, and a listening socket) are exactly the
+# triad AV heuristics read as a DLL-hijack backdoor. They are dead weight on
+# Windows — `is_wine()` is false there, so none of it ever ran.
+proton = []
 
 [package.metadata.winres]
 OriginalFilename = "hook.dll"

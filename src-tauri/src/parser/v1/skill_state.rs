@@ -27,6 +27,36 @@ pub struct SkillTargetState {
     pub total_damage: u64,
 }
 
+/// The LANDING view of one breakdown row: an echo counted as part of the hit
+/// that caused it rather than as a hit of its own (see
+/// [`super::supp_pairing`]).
+///
+/// The per-row twin of the group aggregates' `MergedMeasure`, carried so a
+/// nested child row and the merged parent above it can never disagree. A local
+/// type rather than that one reused: `MergedMeasure` is `Serialize`-only and
+/// `i64`, while a stored breakdown row must round-trip and counts in `u64`.
+///
+/// Filled by the reparse walk's landing pass, not by
+/// [`SkillState::update_from_damage_event`] — a landing's amount depends on
+/// echoes later in the stream, and a running min/max cannot be revised once
+/// written.
+///
+/// All zero on an echo row whose every hit was claimed: that damage now sits on
+/// the triggers. Also all zero on a payload from a backend older than this
+/// field (hence `#[serde(default)]` on the owning field), which the frontend
+/// reads as "nothing to merge".
+#[derive(Debug, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MergedSkillMeasure {
+    pub hits: u32,
+    pub damage: u64,
+    pub min: Option<u64>,
+    pub max: Option<u64>,
+    /// The echo damage inside `damage` — attached echoes for a direct action,
+    /// the whole amount for an orphan echo.
+    pub supplementary: u64,
+}
+
 /// Derived stat breakdown of a particular skill
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -43,6 +73,9 @@ pub struct SkillState {
     pub max_damage: Option<u64>,
     /// Total damage done by this skill
     pub total_damage: u64,
+    /// The landing view of this skill. See [`MergedSkillMeasure`].
+    #[serde(default)]
+    pub merged: MergedSkillMeasure,
     /// Maximum stun value done by this skill
     pub max_stun_value: f64,
     /// Total stun value done by this skill
@@ -95,13 +128,23 @@ pub struct SkillState {
     /// Per-enemy-type share of this skill's damage (same-type spawns merge).
     #[serde(default)]
     pub targets: Vec<SkillTargetState>,
-    /// Gauge this skill generated, summed over the hits attributed to it.
+    /// Gauge this skill generated, summed over the hits attributed to it —
+    /// gauge the hook MEASURED, in a grant frame it could read a cause from.
     ///
-    /// LOCAL PLAYER ONLY: a remote member's gauge is synced rather than granted
-    /// by a hit we can see, so their rows carry 0 and the UI must say so rather
-    /// than presenting a zero as a measurement.
+    /// LOCALLY SIMULATED PLAYERS ONLY: a remote member's gauge is synced rather
+    /// than granted by a hit we can see, so no grant frame runs here and this
+    /// stays 0 for them. What their rows carry instead is `sba_inferred`.
     #[serde(default)]
     pub sba_generated: f64,
+    /// Gauge CORRELATED with this skill rather than measured on it — the
+    /// deduced half, for players whose grant frames never run locally (see the
+    /// `sba_inference` module).
+    ///
+    /// Kept apart from `sba_generated` on purpose: summed together the two are
+    /// this row's best estimate, but only one of them is evidence, and the UI
+    /// must be able to tell a reader which is which.
+    #[serde(default)]
+    pub sba_inferred: f64,
 }
 
 impl SkillState {
@@ -113,6 +156,7 @@ impl SkillState {
             min_damage: None,
             max_damage: None,
             total_damage: 0,
+            merged: MergedSkillMeasure::default(),
             max_stun_value: 0.0,
             total_stun_value: 0.0,
             stun_delta_sum: 0.0,
@@ -126,6 +170,7 @@ impl SkillState {
             overcap_cap_sum: 0.0,
             targets: Vec::new(),
             sba_generated: 0.0,
+            sba_inferred: 0.0,
         }
     }
 
@@ -237,6 +282,10 @@ mod tests {
             base_damage: None,
             target_current_hp: None,
             target_max_hp: None,
+            class_flags: None,
+            source_current_hp: None,
+            source_max_hp: None,
+            source_statuses: None,
         };
 
         let damage_event_two = DamageEvent {
@@ -261,6 +310,10 @@ mod tests {
             base_damage: None,
             target_current_hp: None,
             target_max_hp: None,
+            class_flags: None,
+            source_current_hp: None,
+            source_max_hp: None,
+            source_statuses: None,
         };
 
         skill_state.update_from_damage_event(&AdjustedDamageInstance::from_damage_event(
@@ -301,6 +354,10 @@ mod tests {
             base_damage,
             target_current_hp: None,
             target_max_hp: None,
+            class_flags: None,
+            source_current_hp: None,
+            source_max_hp: None,
+            source_statuses: None,
         }
     }
 

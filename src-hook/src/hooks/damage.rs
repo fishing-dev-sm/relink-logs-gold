@@ -548,10 +548,14 @@ impl OnProcessDamageHook {
                 _ => return unsafe { ProcessDamageBypass.call(a1, a2, a3) },
             };
         let pre_call_source_ptr = damage_source_instance_ptr(a2);
+        // See `SourceState`: the cap this hit was clamped to was computed before
+        // the call, so the attacker state that decided it is the state before
+        // the call.
+        let source_state = SourceState::capture(pre_call_source_ptr.unwrap_or(0));
 
         let previous_stun_value =
             read_f32_guarded(target_specified_instance_ptr, STUN_ACCUMULATOR_OFFSET);
-        let target_pre_hp = read_target_hp_pair(target_specified_instance_ptr);
+        let target_pre_hp = read_actor_hp_pair(target_specified_instance_ptr);
 
         unsafe { ProcessDamageBypass.call(a1, a2, a3) };
 
@@ -567,7 +571,7 @@ impl OnProcessDamageHook {
             read_f32_guarded(target_specified_instance_ptr, STUN_ACCUMULATOR_OFFSET),
         );
         let (target_current_hp, target_max_hp) =
-            read_target_hp_pair(target_specified_instance_ptr).unzip();
+            read_actor_hp_pair(target_specified_instance_ptr).unzip();
         let hp_drop: i64 = match (target_pre_hp, target_current_hp) {
             (Some((pre_cur, _)), Some(post_cur)) => pre_cur as i64 - post_cur as i64,
             _ => 0,
@@ -649,6 +653,7 @@ impl OnProcessDamageHook {
                 parent_index: source_parent_idx,
                 parent_actor_type: source_parent_type_id,
             },
+            source_state,
             Victim {
                 specified_instance_ptr: target_specified_instance_ptr,
                 // Proven not a party slot by the gate above.
@@ -709,11 +714,17 @@ impl OnProcessDamageHook {
         // that never shows in the damage field (Defy Infinity 27.7M, 07-21) — the
         // in-call HP delta is the only way to see it.
         #[cfg(feature = "hookdiag")]
-        let target_pre_hp = read_target_hp_pair(target_specified_instance_ptr);
+        let target_pre_hp = read_actor_hp_pair(target_specified_instance_ptr);
 
         // Source extracted BEFORE the original call (the post-call code reuses
         // this pointer for attribution).
         let pre_call_source_ptr = damage_source_instance_ptr(a2);
+
+        // ...and so is the attacker's own state, for the reason `SourceState`
+        // gives: the cap was computed by the DamageInstance builder before this
+        // call, and a hit that grants its attacker a stack must not be judged
+        // against the stack it is about to earn.
+        let source_state = SourceState::capture(pre_call_source_ptr.unwrap_or(0));
 
         // SOURCE-side accumulator snapshot, diagnostics only: the 07-21 sessions
         // proved the guarded hit itself never moves the ATTACKER's accumulator —
@@ -727,6 +738,48 @@ impl OnProcessDamageHook {
         #[cfg(feature = "hookdiag")]
         if let (Some(src), Some(pre)) = (pre_call_source_ptr, source_previous_stun) {
             b90_check_unattributed("src", src, pre);
+        }
+
+        // Runtime-extras evaluator resolution: the cap builder's one remaining
+        // unidentified additive term is a virtual `+0x70` on the object at
+        // `attacker+0x22F0` (the per-action flat extras — Eustace 115/130/140,
+        // Id's +5/+20). The object's class could not be pinned statically, so
+        // log its vtable and the slot target once per distinct vtable; feeding
+        // the RVAs back through SymbolAt/Decompile closes the term.
+        #[cfg(feature = "hookdiag")]
+        if let Some(src) = pre_call_source_ptr {
+            use std::sync::atomic::{AtomicU32, Ordering};
+            // Bounded, because everything below it is per-hit work on a game
+            // thread: a snapshot lookup plus three guarded reads (each an
+            // `IsBadReadPtr` probe) before `first_n_per_key` gets to decide it
+            // has nothing to log. The distinct vtables here number in the
+            // handful and all of them appear within seconds of a fight
+            // starting, so past this budget the walk could only ever discard
+            // its own result. One relaxed load ends it.
+            static PROBES: AtomicU32 = AtomicU32::new(0);
+            const PROBE_BUDGET: u32 = 20_000;
+            if PROBES.load(Ordering::Relaxed) < PROBE_BUDGET
+                && super::player::player_slot_key_for_actor(src as *const usize).is_some()
+            {
+                PROBES.fetch_add(1, Ordering::Relaxed);
+                use crate::hooks::diag::{read_ptr_guarded, MODULE_BASE};
+                static SEEN: std::sync::Mutex<Vec<(usize, u32)>> =
+                    std::sync::Mutex::new(Vec::new());
+                if let Some((obj, vtable, slot70)) = read_ptr_guarded(src, 0x22f0)
+                    .filter(|obj| *obj != 0)
+                    .and_then(|obj| Some((obj, read_ptr_guarded(obj, 0)?)))
+                    .and_then(|(obj, vt)| Some((obj, vt, read_ptr_guarded(vt, 0x70)?)))
+                {
+                    if crate::hooks::diag::first_n_per_key(&SEEN, vtable, 1) {
+                        let base = MODULE_BASE.load(std::sync::atomic::Ordering::Relaxed);
+                        log::info!(
+                            "CAPEXTRAS src={src:#x} obj={obj:#x} vtable_rva={:#x} slot70_rva={:#x}",
+                            vtable.wrapping_sub(base),
+                            slot70.wrapping_sub(base),
+                        );
+                    }
+                }
+            }
         }
 
         // Cross-event PG watch: if a prior enemy→player hit armed a window on this
@@ -886,7 +939,7 @@ impl OnProcessDamageHook {
                 // the damage field entirely (guarded Quickening, 07-21).
                 let hp_drop: i64 = match (
                     target_pre_hp,
-                    read_target_hp_pair(target_specified_instance_ptr),
+                    read_actor_hp_pair(target_specified_instance_ptr),
                 ) {
                     (Some((pre_cur, _)), Some((post_cur, _))) => pre_cur as i64 - post_cur as i64,
                     _ => 0,
@@ -1076,12 +1129,23 @@ impl OnProcessDamageHook {
             source_specified_instance_ptr as *const usize,
         );
 
+        // SBAWEIGHT (hookdiag): the per-hit gauge weight at instance+0x100. Read
+        // here because this is the one path that runs for EVERY player — a
+        // remote's gauge is never computed locally, but their damage is.
+        #[cfg(feature = "hookdiag")]
+        crate::hooks::diag::probe_sba_hit_weight(
+            damage_instance as *const _ as usize,
+            source_parent_idx,
+            damage_instance.action_id,
+            damage_instance.damage,
+        );
+
         // Post-hit target HP from the ExHp component. Read AFTER the original call so
         // the killing blow reports 0. Guarded read + plausibility checks: an actor
         // class without the +0x150 embed, or a future patch shifting it, yields None
         // rather than garbage.
         let (target_current_hp, target_max_hp) =
-            read_target_hp_pair(target_specified_instance_ptr).unzip();
+            read_actor_hp_pair(target_specified_instance_ptr).unzip();
 
         // PGDMG (hookdiag, unbudgeted): on some quest versions the guarded-Quickening
         // counter arrives as a NORMAL player-attributed hit with action id 0 (Chaos++
@@ -1132,6 +1196,7 @@ impl OnProcessDamageHook {
                 parent_index: source_parent_idx,
                 parent_actor_type: source_parent_type_id,
             },
+            source_state,
             Victim {
                 specified_instance_ptr: target_specified_instance_ptr,
                 // Proven not a party slot by the gate above.
@@ -1349,6 +1414,17 @@ impl OnProcessDotHook {
             base_damage: None,
             target_current_hp: None,
             target_max_hp: None,
+            // A DoT tick has no DamageInstance to read a class off, and it is
+            // not one of the three cap classes anyway.
+            class_flags: None,
+            // ...and for the same reason it carries no attacker state: a tick's
+            // magnitude was fixed when the status was applied, so the applier's
+            // HP and buffs NOW are not what produced it. Capturing them would
+            // put state on the wire that answers a question nobody asked of
+            // this event.
+            source_current_hp: None,
+            source_max_hp: None,
+            source_statuses: None,
         });
 
         let _ = self.tx.send(event);
@@ -1538,13 +1614,18 @@ impl OnPlayerHitApplyHook {
                 .unwrap()
                 .as_ref()
         };
-        let (target_current_hp, target_max_hp) = read_target_hp_pair(victim_ptr).unzip();
+        let (target_current_hp, target_max_hp) = read_actor_hp_pair(victim_ptr).unzip();
         // `victim_slot` rather than letting the builder resolve it: that lookup
         // keys only actors carrying a slot identity THEMSELVES, while the
         // resolution above also covers owned bodies (dragon form).
         let _ = self.tx.send(Message::DamageEvent(build_damage_event(
             damage_instance,
             source,
+            // No attacker state on the taken stream. A player source is
+            // rejected outright above, so every attacker reaching here is an
+            // enemy — whose HP and buffs are not inputs to any cap this meter
+            // itemizes, and whose `ExStatus` lives at a different embed offset.
+            SourceState::default(),
             Victim {
                 specified_instance_ptr: victim_ptr,
                 slot: Some(victim_slot),
@@ -1554,6 +1635,66 @@ impl OnPlayerHitApplyHook {
             damage,
             0.0,
         )));
+    }
+}
+
+/// The ATTACKER's own runtime state at the moment a hit was registered — what a
+/// conditional damage-cap source is gated on ("while at 75% HP or more", "while
+/// Enchantress's Rhythm is active", "per stack of DMG Cap Cardinal").
+///
+/// Captured PRE-CALL, unlike the target's HP pair. The cap this hit was clamped
+/// to was computed by the DamageInstance builder before the game's damage call
+/// ever ran, so the state that decided it is the state before the call — and a
+/// hit that grants its own attacker a stack (which is how several of these
+/// traits work) would otherwise be judged against a stack it had not yet earned.
+///
+/// [`Default`] is "nothing captured", which is what a non-player attacker
+/// publishes: an enemy's HP and buffs are not inputs to any cap the meter
+/// itemizes, and its `ExStatus` sits at a different embed offset (see
+/// `status::PLAYER_EX_STATUS_OFFSET`), so reading one would be reading the
+/// wrong component.
+#[derive(Default)]
+struct SourceState {
+    current_hp: Option<u64>,
+    max_hp: Option<u64>,
+    statuses: Option<Vec<protocol::SourceStatus>>,
+}
+
+impl SourceState {
+    /// Snapshot `actor` if — and only if — the body being read carries a party
+    /// slot on its OWN embedded record.
+    ///
+    /// That test is the gate, not a convenience: it is true exactly for a
+    /// player's own `Pl####` body, which is the family both component offsets
+    /// were verified against. A summon, a pet, or an owned body resolves its
+    /// slot through the owner walk instead and is deliberately left uncaptured
+    /// rather than read at offsets nothing proved apply to it.
+    ///
+    /// The ONE owner-walked exception is Id's dragon form: a transformed Id
+    /// deals every hit from the `Pl2000` body (whole fights, not a burst
+    /// window — logs 2571/2573 show ~92% of Id's hits with no capturable
+    /// state), and the body this then reads is the walked-to HUMAN `Pl1900`
+    /// instance — a verified player layout, gated by the same slot test as
+    /// everything else. The dragon body itself is never read.
+    fn capture(actor: usize) -> Self {
+        if actor == 0 {
+            return Self::default();
+        }
+        let ptr = actor as *const usize;
+        let body = if super::player::player_slot_key_for_actor(ptr).is_some() {
+            ptr
+        } else {
+            match super::summon::dragon_form_owner(super::actor_type_id(ptr), ptr) {
+                Some(owner) if super::player::player_slot_key_for_actor(owner).is_some() => owner,
+                _ => return Self::default(),
+            }
+        };
+        let (current_hp, max_hp) = read_actor_hp_pair(body as usize).unzip();
+        Self {
+            current_hp,
+            max_hp,
+            statuses: super::status::snapshot_player_statuses(body),
+        }
     }
 }
 
@@ -1576,10 +1717,16 @@ struct Victim {
 fn build_damage_event(
     damage_instance: &DamageInstance,
     source: Actor,
+    source_state: SourceState,
     target: Victim,
     damage: i32,
     added_stun_value: f32,
 ) -> DamageEvent {
+    let SourceState {
+        current_hp: source_current_hp,
+        max_hp: source_max_hp,
+        statuses: source_statuses,
+    } = source_state;
     let Victim {
         specified_instance_ptr: target_specified_instance_ptr,
         slot: target_slot,
@@ -1653,6 +1800,14 @@ fn build_damage_event(
         base_damage,
         target_current_hp,
         target_max_hp,
+        // Carried for every hit, cappable or not: the class is a fact about the
+        // attack, and gating it on `damage_cap` the way `base_damage` is gated
+        // would make an uncapped hit unable to say which cap-up would have
+        // applied to it.
+        class_flags: Some(damage_instance.class_flags),
+        source_current_hp,
+        source_max_hp,
+        source_statuses,
     }
 }
 
@@ -1668,24 +1823,32 @@ fn target_spawn_id(instance: usize) -> u32 {
     ((instance >> 4) as u32) ^ ((instance >> 36) as u32)
 }
 
-/// The target's HP lives in its `ExHp` component, embedded at instance+0x150 (statically
+/// An actor's HP lives in its `ExHp` component, embedded at instance+0x150 (statically
 /// derived for v2.0.2: `ExHp::RTTI_Base_Class_Descriptor_at_(336)` + the ProcessDamageEvent
 /// decompile both pin the embed; the vtable getters read current at this+0x10 and max at
 /// this+0x18 as 64-bit ints).
-const TARGET_HP_PAIR_OFFSET: usize = 0x150 + 0x10;
+///
+/// TARGET and SOURCE read the same offset because there is only one to read: the
+/// v2.0.4 image defines exactly two `ExHp::RTTI_Base_Class_Descriptor_at_(N)` —
+/// N = 0 and N = 336 — and every class checked (the thirty playable `Pl####`
+/// classes, `Np0000`, and the enemy classes `Em1200`/`Em2700`) lists the 336 one
+/// in its `RTTI_Base_Class_Array`. Unlike `ExStatus`, whose embed offset differs
+/// between players and enemies, this component sits in one place for everything
+/// that has HP.
+const ACTOR_HP_PAIR_OFFSET: usize = 0x150 + 0x10;
 
-/// Read the target's post-hit `(current, max)` HP pair, or `None` when the location isn't
+/// Read an actor's `(current, max)` HP pair, or `None` when the location isn't
 /// readable or the values don't look like a live HP pool.
 ///
 /// The two fields are adjacent 8-byte ints, so ONE 16-byte guard covers both. Two separate
 /// `read_ptr_guarded` calls would add two `IsBadReadPtr` probes per hit to a path that runs
 /// thousands of times a second on the game's own thread — per-call guard cost on this path
 /// is what caused the v1.9.2 in-combat slowdown.
-fn read_target_hp_pair(instance: usize) -> Option<(u64, u64)> {
+fn read_actor_hp_pair(instance: usize) -> Option<(u64, u64)> {
     if instance == 0 {
         return None;
     }
-    let addr = instance.wrapping_add(TARGET_HP_PAIR_OFFSET);
+    let addr = instance.wrapping_add(ACTOR_HP_PAIR_OFFSET);
     if !readable(addr, 2 * std::mem::size_of::<u64>()) {
         return None;
     }
@@ -1695,7 +1858,7 @@ fn read_target_hp_pair(instance: usize) -> Option<(u64, u64)> {
             ((addr + 8) as *const u64).read_unaligned(),
         )
     };
-    sanitize_target_hp(Some(current), Some(max))
+    sanitize_hp_pair(Some(current), Some(max))
 }
 
 /// Validate a raw (current, max) HP pair read from the target's ExHp component.
@@ -1710,7 +1873,7 @@ fn read_target_hp_pair(instance: usize) -> Option<(u64, u64)> {
 /// directly: heap/ASLR'd-module addresses are all far above the ceiling, and
 /// image pointers (vtable/function slots — what a shifted offset would most
 /// likely read) are rejected as a pair via the image band below.
-fn sanitize_target_hp(current: Option<u64>, max: Option<u64>) -> Option<(u64, u64)> {
+fn sanitize_hp_pair(current: Option<u64>, max: Option<u64>) -> Option<(u64, u64)> {
     const MAX_PLAUSIBLE_HP: u64 = 100_000_000_000;
     /// granblue_fantasy_relink.exe loads at its preferred base 0x140000000;
     /// pointers into the image land in this band. A real HP pair only overlaps
@@ -1849,51 +2012,51 @@ mod tests {
     /// future patch — reject anything that doesn't look like a live HP pair so
     /// garbage can never reach the parser as real HP.
     #[test]
-    fn sanitize_target_hp_accepts_only_plausible_pairs() {
+    fn sanitize_hp_pair_accepts_only_plausible_pairs() {
         // Ordinary mid-fight value.
         assert_eq!(
-            sanitize_target_hp(Some(49_000_000), Some(50_000_000)),
+            sanitize_hp_pair(Some(49_000_000), Some(50_000_000)),
             Some((49_000_000, 50_000_000))
         );
         // Death (current 0) is valid.
         assert_eq!(
-            sanitize_target_hp(Some(0), Some(50_000_000)),
+            sanitize_hp_pair(Some(0), Some(50_000_000)),
             Some((0, 50_000_000))
         );
         // Full HP is valid.
-        assert_eq!(sanitize_target_hp(Some(500), Some(500)), Some((500, 500)));
+        assert_eq!(sanitize_hp_pair(Some(500), Some(500)), Some((500, 500)));
         // Hard-mode v2.0.2 boss scale (Lucilius ~7.5e9) must pass — the old
         // 5e9 ceiling silently dropped HP capture for these fights.
         assert_eq!(
-            sanitize_target_hp(Some(7_400_000_000), Some(7_500_000_000)),
+            sanitize_hp_pair(Some(7_400_000_000), Some(7_500_000_000)),
             Some((7_400_000_000, 7_500_000_000))
         );
         // A pool whose max lands inside the image band is still accepted once
         // current has fallen below the band — only pointer-LIKE PAIRS reject.
         assert_eq!(
-            sanitize_target_hp(Some(5_000_000_000), Some(5_500_000_000)),
+            sanitize_hp_pair(Some(5_000_000_000), Some(5_500_000_000)),
             Some((5_000_000_000, 5_500_000_000))
         );
 
         // A failed guarded read on either side -> None.
-        assert_eq!(sanitize_target_hp(None, Some(50_000_000)), None);
-        assert_eq!(sanitize_target_hp(Some(49_000_000), None), None);
+        assert_eq!(sanitize_hp_pair(None, Some(50_000_000)), None);
+        assert_eq!(sanitize_hp_pair(Some(49_000_000), None), None);
         // Zero max = uninitialized component -> None.
-        assert_eq!(sanitize_target_hp(Some(0), Some(0)), None);
+        assert_eq!(sanitize_hp_pair(Some(0), Some(0)), None);
         // current > max = not an HP pair -> None.
-        assert_eq!(sanitize_target_hp(Some(51_000_000), Some(50_000_000)), None);
+        assert_eq!(sanitize_hp_pair(Some(51_000_000), Some(50_000_000)), None);
         // A pair of exe-image pointers (vtable slots at a shifted offset) -> None.
         assert_eq!(
-            sanitize_target_hp(Some(0x1_4000_0000), Some(0x1_4000_0000)),
+            sanitize_hp_pair(Some(0x1_4000_0000), Some(0x1_4000_0000)),
             None
         );
         assert_eq!(
-            sanitize_target_hp(Some(0x1_4012_3450), Some(0x1_4567_89A0)),
+            sanitize_hp_pair(Some(0x1_4012_3450), Some(0x1_4567_89A0)),
             None
         );
         // Heap / ASLR'd-module addresses -> None (above the ceiling).
         assert_eq!(
-            sanitize_target_hp(Some(0x7FF6_0000_0000), Some(0x7FF6_0000_0008)),
+            sanitize_hp_pair(Some(0x7FF6_0000_0000), Some(0x7FF6_0000_0008)),
             None
         );
     }

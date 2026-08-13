@@ -5,6 +5,24 @@ version without a section here, and the section body becomes the GitHub
 release body — which the in-app update prompt shows as patch notes. Renders
 markdown in the app.
 
+## 1.12.14-9000
+
+### Notes
+
+- Merged upstream 1.12.13 and the 1.12.14 development line: the Linux modules were split out of the Windows release (reducing Windows Defender false positives), the hook DLL is now a reproducible build, and the beta log viewer links supplementary damage to its damage event and can filter the event view by column. The gold-rule settings (Settings → General) are unchanged.
+
+## 1.12.13
+
+### Notes
+
+- Split out the modules required for Linux support from the Windows release. These were unnecessary
+  for the Windows version and were one of the reasons Windows Defender would sometimes flag the application as malware
+
+### Features
+
+- Supplementary damage is now linked to its damage event in the event view in the beta log viewer
+- The event view in the beta log viewer can be filtered by column
+
 ## 1.12.12-9000
 
 ### Notes

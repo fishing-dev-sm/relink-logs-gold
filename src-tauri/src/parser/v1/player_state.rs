@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::parser::constants::{CharacterType, EnemyType, FerrySkillId};
 
-use super::{skill_state::SkillState, AdjustedDamageInstance};
+use super::{skill_state::SkillState, AdjustedDamageInstance, BreakdownKey};
 
 /// How long a Perfect Guard may claim a trailing network stun message. The
 /// captured guard messages arrived at +100/+100/+101ms, and ordinary hits'
@@ -41,7 +41,7 @@ pub struct BreakdownKeying {
 }
 
 impl BreakdownKeying {
-    pub fn key_for(&mut self, event: &DamageEvent) -> (ActionType, CharacterType) {
+    pub fn key_for(&mut self, event: &DamageEvent) -> BreakdownKey {
         let key = self.resolve(event);
         // Remembered under the RAW id, which is what an SBA gain carries: the
         // resolved key can differ in BOTH halves (Ferry's pet remap rewrites the
@@ -147,6 +147,11 @@ pub enum SbaSourceKind {
     PerfectDodge,
     Site,
     Unknown,
+    /// Deduced, not read (see `sba_inference`): a flat SBA-chain contribution
+    /// recognised by its exact value.
+    InferredChainGrant,
+    /// Deduced, not read: gauge correlated with a hit the player received.
+    InferredDamageTaken,
 }
 
 /// One cause's share of a player's generated gauge.
@@ -424,6 +429,25 @@ impl PlayerState {
         }
     }
 
+    /// Files one gauge gain the parser DEDUCED against the breakdown row of the
+    /// action it was correlated with (see the `sba_inference` module).
+    ///
+    /// Same row lookup as [`Self::add_sba_gain`] — an inferred gain is keyed off
+    /// a hit that exists, so it can no more open a row than a read one can — but
+    /// it accrues to `sba_inferred` instead of `sba_generated`, so a row always
+    /// reports how much of its gauge was measured and how much was concluded.
+    /// Merging the two would make a correlation indistinguishable from a
+    /// reading, which is the one thing inference is not allowed to do.
+    ///
+    /// A gain whose row has not opened is DROPPED, not held: this runs after
+    /// the whole log is folded, so nothing will open one later.
+    pub fn add_inferred_sba_gain(&mut self, action: ActionType, amount: f64) {
+        if let Some((row_action, child_character_type)) = self.keying.row_for_raw_action(action) {
+            self.breakdown_row_mut(row_action, child_character_type)
+                .sba_inferred += amount;
+        }
+    }
+
     /// Files one gauge gain that no skill row can hold (see [`SbaSourceState`]).
     ///
     /// Like [`Self::add_sba_gain`] this does NOT touch `sba_generated`: the
@@ -519,7 +543,18 @@ impl PlayerState {
         self.stun_per_second = self.total_stun_value / duration_secs;
     }
 
-    pub fn update_from_damage_event(&mut self, damage_instance: &AdjustedDamageInstance) {
+    /// Returns the breakdown row this hit landed in — the [`BreakdownKey`]
+    /// [`BreakdownKeying`] assigned it.
+    ///
+    /// Returned rather than recomputed by anyone who needs it: that keying is
+    /// stateful and order-dependent (Ferry's pet remap, the raw-action memo),
+    /// so a second `key_for` for the same event would advance its state and
+    /// mis-key everything after it. The reparse's landing pass is the caller
+    /// that needs it; every other caller ignores it.
+    pub fn update_from_damage_event(
+        &mut self,
+        damage_instance: &AdjustedDamageInstance,
+    ) -> BreakdownKey {
         if damage_instance.is_cappable {
             self.cappable_hits += 1;
         }
@@ -567,6 +602,8 @@ impl PlayerState {
         if let Some(amount) = held {
             row.sba_generated += amount;
         }
+
+        (action, child_character_type)
     }
 }
 
@@ -642,6 +679,10 @@ mod tests {
             base_damage: None,
             target_current_hp: None,
             target_max_hp: None,
+            class_flags: None,
+            source_current_hp: None,
+            source_max_hp: None,
+            source_statuses: None,
         };
 
         player_state.update_from_damage_event(&AdjustedDamageInstance::from_damage_event(
@@ -680,6 +721,10 @@ mod tests {
             base_damage: None,
             target_current_hp: None,
             target_max_hp: None,
+            class_flags: None,
+            source_current_hp: None,
+            source_max_hp: None,
+            source_statuses: None,
         };
 
         player_state.update_from_damage_event(&AdjustedDamageInstance::from_damage_event(
@@ -726,6 +771,10 @@ mod tests {
             base_damage: None,
             target_current_hp: None,
             target_max_hp: None,
+            class_flags: None,
+            source_current_hp: None,
+            source_max_hp: None,
+            source_statuses: None,
         };
 
         let skill_two = DamageEvent {
@@ -750,6 +799,10 @@ mod tests {
             base_damage: None,
             target_current_hp: None,
             target_max_hp: None,
+            class_flags: None,
+            source_current_hp: None,
+            source_max_hp: None,
+            source_statuses: None,
         };
 
         player_state
@@ -791,6 +844,10 @@ mod tests {
             base_damage: None,
             target_current_hp: None,
             target_max_hp: None,
+            class_flags: None,
+            source_current_hp: None,
+            source_max_hp: None,
+            source_statuses: None,
         };
 
         let child_skill = DamageEvent {
@@ -815,6 +872,10 @@ mod tests {
             base_damage: None,
             target_current_hp: None,
             target_max_hp: None,
+            class_flags: None,
+            source_current_hp: None,
+            source_max_hp: None,
+            source_statuses: None,
         };
 
         player_state.update_from_damage_event(&AdjustedDamageInstance::from_damage_event(
@@ -862,6 +923,10 @@ mod tests {
             base_damage: None,
             target_current_hp: None,
             target_max_hp: None,
+            class_flags: None,
+            source_current_hp: None,
+            source_max_hp: None,
+            source_statuses: None,
         };
 
         let player_data = PlayerData {
@@ -877,6 +942,12 @@ mod tests {
             skillboard: Vec::new(),
             stats: None,
             weapon_state: None,
+            cap_up_normal: None,
+            cap_up_skill: None,
+            cap_up_sba: None,
+            limit_bonus_cap_normal: None,
+            limit_bonus_cap_skill: None,
+            limit_bonus_cap_sba: None,
             is_online: false,
             weapon_info: None,
             overmastery_info: None,
@@ -924,6 +995,10 @@ mod tests {
             base_damage: None,
             target_current_hp: None,
             target_max_hp: None,
+            class_flags: None,
+            source_current_hp: None,
+            source_max_hp: None,
+            source_statuses: None,
         };
 
         player_state.update_from_damage_event(&AdjustedDamageInstance::from_damage_event(
@@ -957,6 +1032,10 @@ mod tests {
             base_damage: Some(40_000.0), // base > cap -> capped
             target_current_hp: None,
             target_max_hp: None,
+            class_flags: None,
+            source_current_hp: None,
+            source_max_hp: None,
+            source_statuses: None,
         }
     }
 
@@ -983,6 +1062,10 @@ mod tests {
             base_damage: Some(100.0), // base < cap -> not capped
             target_current_hp: None,
             target_max_hp: None,
+            class_flags: None,
+            source_current_hp: None,
+            source_max_hp: None,
+            source_statuses: None,
         }
     }
 
@@ -1206,6 +1289,10 @@ mod tests {
             base_damage: None,
             target_current_hp: None,
             target_max_hp: None,
+            class_flags: None,
+            source_current_hp: None,
+            source_max_hp: None,
+            source_statuses: None,
         }
     }
 

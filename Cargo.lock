@@ -1434,7 +1434,7 @@ dependencies = [
 
 [[package]]
 name = "gbfr-logs"
-version = "1.12.12-9000"
+version = "1.12.14-9000"
 dependencies = [
  "anyhow",
  "cbor4ii",
@@ -1858,7 +1858,7 @@ checksum = "7f24254aa9a54b5c858eaee2f5bccdb46aaf0e486a595ed5fd8f86ba55232a70"
 
 [[package]]
 name = "hook"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "anyhow",
  "backtrace",
